@@ -1,323 +1,416 @@
-# Agentity Backend
+# 🚀 Agentity Backend
 
-Agentity is a backend orchestration + trust layer for AI agents interacting with blockchain smart contracts. It provides:
-- Agent identity registry + metadata + reputation
-- Agent verification lifecycle + behavior logging
-- Docker sandbox simulation that returns risk scores
-- Execution routing via Chainlink Runtime Environment (CRE) (fallback supported)
-- Supabase Auth (users) + Supabase Postgres (single database)
-- User ↔ Agent interaction tracking (NOT ownership) via audit events
-- Dashboard API for frontend integrations
-- Health monitoring + request logging
+> Identity Registry + AI Agent Verification + Simulation + Blockchain Sync + Supabase Auth + Dashboard Analytics
 
----
-
-## Live URL
-- Backend (Render): https://agentity-backend.onrender.com
-
-
-
-## Architecture (High-Level)
-
-Frontend (Supabase Auth)
-  └── sends Authorization: Bearer <access_token>
-        ↓
-Backend (Express + Sequelize)
-        ↓
-Supabase Postgres (single DB)
-  - Agents + Metadata + Reputation + Behavior Logs
-  - user_agent_events (audit trail)
-        ↓
-Docker Simulation Sandbox
-        ↓
-CRE Webhook (if available) → Smart Contracts
-(fallback execution if CRE deploy is not available)
-
-
-## Key Design Decision: Agents are NOT Owned by Users
-
-A user can:
-- register agents
-- fetch agents
-- verify agents
-- simulate agents
-- execute agents
-
-Multiple users can interact with the same agent.  
-We track user activity using `user_agent_events` (audit trail), not `agents.user_id`.
-
-
-## Project Structure
+Live Deployment:
 
 ```
-
-src/
-app.js
-server.js
-config/
-database.js
-logger.js
-supabase.js
-middleware/
-auth.js
-models/
-agent.js
-agentMetadata.js
-agentReputation.js
-agentBehaviourLog.js
-userAgentEvent.js
-index.js
-routes/
-agents.js
-simulation.js
-execution.js
-dashboard.js
-services/
-sandbox/
-cre/
-audit/
-db/
-schema.sql
-agentity-cre/
-agent-execution/
-main.ts
-workflow.yml
-
-````
-
-
-## Environment Variables
-
-Create `.env` at the project root:
-
-```bash
-NODE_ENV=development
-PORT=5000
-
-# Supabase Postgres (Option B)
-DATABASE_URL=postgresql://postgres.<project_ref>:<password>@aws-1-eu-west-1.pooler.supabase.com:6543/postgres?pgbouncer=true
-
-# Supabase Auth
-SUPABASE_URL=https://<project_ref>.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=<service_role_key>
-
-# CRE (optional - fallback used if missing)
-CRE_WEBHOOK_URL=
-CRE_API_KEY=
-````
-
-Important:
-
-* Do NOT put `sslmode=require` in DATABASE_URL (your setup works without it).
-* SSL is handled in `src/config/database.js`.
-
-
-## Install & Run (Local)
-
-```bash
-npm install
-npm run dev
+https://agentity-backend.onrender.com
 ```
 
 
-## Docker Sandbox
+# 📌 Project Overview
 
-Build sandbox:
+Agentity is a backend system designed to:
 
-```bash
-npm run sandbox:build
-```
-
-Run sandbox locally (manual):
-
-```bash
-npm run sandbox:run
-```
-
-Note: Docker must be running.
+* Register and verify AI agents
+* Track user interaction with agents
+* Simulate agent execution in sandbox
+* Execute agents via Chainlink CRE
+* Sync agent registration to blockchain (Avalanche C-Chain)
+* Provide a structured dashboard for frontend
+* Track analytics and vulnerabilities
+* Use Supabase for authentication and database
 
 
-## Database Schema (schema.sql)
+# 🏗️ System Architecture
 
-We provide a DB schema for teammates (especially blockchain/devops) at:
+### 🔐 Authentication Layer
 
-`db/schema.sql`
+* Supabase Auth
+* JWT-based access control
+* Backend verifies Supabase access_token
 
-Apply to Supabase:
+### 🗄️ Database Layer
 
-* Supabase Dashboard → SQL Editor → paste `db/schema.sql` → Run
+* Supabase Managed PostgreSQL
+* Sequelize ORM
+* Row Level Security (Supabase side)
+* Service role used for backend writes
 
-Or via CLI:
+### 🤖 Agent Layer
 
-```bash
-npm run db:schema:apply
-```
+* Agent registry
+* Metadata
+* Reputation
+* Behavior logs
+* Blockchain sync metadata
 
-`schema.sql` includes:
+### 🧪 Simulation Layer
 
-* tables for agents, metadata, reputation, behavior logs
-* `user_agent_events` table
-* RLS policies on `user_agent_events` so users only see their own audit history
+* Docker-based sandbox
+* Local simulation service
 
+### 🔗 Blockchain Layer
 
-## API Reference (Frontend)
+* On-chain registration support
+* Avalanche C-Chain
+* Tracks:
 
-Base URL:
+  * blockchain_agent_id
+  * blockchain_tx_hash
+  * blockchain_registered_at
+  * blockchain_sync_status
 
-* Local: [http://localhost:5000](http://localhost:5000)
-* Prod: [https://agentity-backend.onrender.com](https://agentity-backend.onrender.com)
+### 📊 Dashboard Analytics Layer
 
-### Auth Header
-
-Frontend should call APIs with:
-
-```
-Authorization: Bearer <supabase_access_token>
-```
-
-If no token is provided:
-
-* endpoints still work
-* audit logging won’t record a user_id (because user is anonymous)
+* User activity tracking
+* Agent interaction tracking
+* Vulnerability detection metrics
+* Chart aggregation (7-day series)
 
 
-## Agents
+# 🔐 Authentication Flow
 
-### Register Agent
+Authentication is fully handled via **Supabase Auth**.
 
-POST `/agents/register`
+Backend exposes:
 
-Body:
+## POST `/auth/register`
+
+Registers a new user.
+
+### Request
 
 ```json
 {
-  "agent_name": "Agent Alpha",
-  "public_key": "0xabc...",
-  "model_name": "gpt-4",
-  "version": "1.0",
-  "execution_environment": "node"
+  "email": "user@mail.com",
+  "password": "Password123!",
+  "name": "John Doe"
 }
 ```
 
-### Get Agent Profile
+### Response
 
-GET `/agents/:id`
-
-### Verify Agent
-
-POST `/agents/:id/verify`
-
-
-## Simulation
-
-### Simulate Agent (Docker)
-
-POST `/simulation/:id`
-
-Returns:
-
-* riskScore
-* status
+```json
+{
+  "email": "user@mail.com",
+  "name": "John Doe",
+  "jwt": "SUPABASE_ACCESS_TOKEN",
+  "dashboard": { ...dashboardObject }
+}
+```
 
 
-## Execution
+## POST `/auth/login`
 
-### Execute Agent (Simulation → CRE)
+### Request
 
-POST `/execute/:id`
+```json
+{
+  "email": "user@mail.com",
+  "password": "Password123!"
+}
+```
+
+### Response
+
+```json
+{
+  "email": "user@mail.com",
+  "name": "John Doe",
+  "jwt": "SUPABASE_ACCESS_TOKEN",
+  "dashboard": { ...dashboardObject }
+}
+```
+
+
+
+### 🔑 JWT Usage
+
+All protected endpoints require:
+
+```
+Authorization: Bearer <jwt>
+```
+
+JWT = Supabase `access_token`.
+
+Backend verifies token using:
+
+```
+supabaseAdmin.auth.getUser(token)
+```
+
+---
+
+# 👤 Dashboard Endpoint
+
+## GET `/dashboard/overview`
+
+Requires Bearer token.
+
+Returns frontend dashboard DTO:
+
+```js
+{
+  email,
+  name,
+  Totalagent,
+  TotalvarifiedAgent,
+  activeSimulation,
+  VulnerabilitiesDetected,
+  TransactionsExecuted,
+  chart: {
+    labels: ["2026-03-01", ...],
+    Verification: [0,2,1,0,3,0,1],
+    Vulnerability: [0,1,0,0,2,0,0]
+  },
+  activeAgent,
+  RecentActivity: [...]
+}
+```
+
+### What Each Field Means
+
+| Field                   | Meaning                            |
+| ----------------------- | ---------------------------------- |
+| Totalagent              | Unique agents user interacted with |
+| TotalvarifiedAgent      | Total verification events          |
+| activeSimulation        | Simulations in last 24h            |
+| VulnerabilitiesDetected | Risk score ≥ 0.7                   |
+| TransactionsExecuted    | Execution events                   |
+| chart                   | 7-day time series                  |
+| activeAgent             | Most recently interacted agent     |
+| RecentActivity          | Last 20 user events                |
+
+
+
+# 🤖 Agent API
+
+## POST `/agents/register`
+
+Registers a new AI agent.
+
+### Body
+
+```json
+{
+  "agent_name": "My AI",
+  "public_key": "abc123",
+  "model_name": "GPT-X",
+  "version": "1.0",
+  "execution_environment": "docker"
+}
+```
+
+Creates:
+
+* Agent
+* Metadata
+* Reputation record
+
+
+## POST `/agents/:id/verify`
+
+Verifies agent.
+
+Logs behavior event:
+
+```
+event_type: "verification"
+```
+
+
+
+## GET `/agents/:id`
+
+Returns full agent profile including:
+
+* metadata
+* reputation
+
+
+# 🧪 Simulation
+
+## POST `/simulation/:id`
+
+Simulates agent execution in sandbox.
+
+
+# 🔗 Execution (CRE Integration)
+
+## POST `/execute/:id`
 
 Flow:
 
 1. Agent must be verified
-2. Run simulation to generate riskScore
-3. If CRE_WEBHOOK_URL exists → send payload to CRE
-4. Else → fallback execution response
+2. Simulate agent
+3. Send to CRE if deployed
+4. Return simulation + execution result
+
+If CRE not deployed:
+
+* Fallback execution is returned
 
 
-## Dashboard (Frontend)
+# ⛓ Blockchain Fields (Agent Model)
 
-### Dashboard Overview
+Agents include:
 
-GET `/dashboard/overview`
-Requires auth header.
+* blockchain_agent_id
+* blockchain_tx_hash
+* blockchain_registered_at
+* blockchain_sync_status
+* blockchain_sync_error
 
-Returns:
-
-* user (id/email)
-* summary counts
-* recent activity (from user_agent_events)
-* last agents interacted with
+Partial unique index on blockchain_agent_id (when not null).
 
 
+# 📦 Database Models
 
-## Monitoring
+* Agent
+* AgentMetadata
+* AgentReputation
+* AgentBehaviorLog
+* UserAgentEvent
+* UserProfile (optional mirror)
 
-### Health Check
-
-GET `/health`
-
-Returns:
-
-* API status
-* DB connectivity
-* uptime
+All managed via Sequelize.
 
 
-## CRE (Chainlink Runtime Environment)
+# 🛡 Row Level Security (Supabase)
 
-CRE is the secure runtime execution layer between backend and smart contracts.
+RLS is enabled in Supabase for:
 
-Current status:
+* user_profiles
+* user_agent_events
 
-* Workflow compiles and simulates locally
-* Deployment access may be gated (early access)
-* Backend supports fallback execution if CRE deploy is not available
-
-Supabase integration does NOT require changes to CRE workflow.
-CRE focuses on execution policy + smart contract calls.
+Backend uses service role → bypasses RLS.
+Frontend (if reading directly) respects RLS.
 
 
-## How to Test Supabase Integration
+# 🐳 Sandbox
 
-1. DB connection:
+Docker container:
 
-```bash
-curl http://localhost:5000/health
+```
+agentity-sandbox
 ```
 
-Expect: `"database": "connected"`
+Used for simulation layer.
 
-2. Auth verification:
 
-* Login via Supabase Auth in frontend
-* Copy `access_token`
-* Call:
+# 🔄 CRE Integration
 
-```bash
-curl -H "Authorization: Bearer <TOKEN>" http://localhost:5000/dashboard/overview
+Chainlink CRE workflow created.
+
+Currently:
+
+* Simulation works locally
+* Deployment requires early access approval
+
+Future:
+
+* Replace fallback execution with webhook-based execution.
+
+
+
+# 🧪 How To Test Supabase Integration
+
+### 1️⃣ Health Check
+
+```
+GET /health
 ```
 
-Expect: user email + activity data.
+### 2️⃣ Register User
 
-3. Audit logging:
+```
+POST /auth/register
+```
 
-* With token, call `/agents/register`, `/agents/:id/verify`, `/simulation/:id`
-* Check Supabase table: `user_agent_events` should contain rows for your user.
+### 3️⃣ Use JWT
+
+```
+GET /dashboard/overview
+Authorization: Bearer <jwt>
+```
+
+### 4️⃣ Verify DB writes
+
+Check Supabase Table Editor.
 
 
-## Blockchain / Smart Contract Teammate Notes
+# 👨‍💻 Frontend Integration Guide
 
-Backend will provide (via CRE payload):
+Frontend should:
 
-* agentId
-* fingerprint
-* simulation result (riskScore, status)
+1. Call `/auth/login`
+2. Store JWT
+3. Call `/dashboard/overview`
+4. Use:
 
-Blockchain tasks:
+   * Totalagent for stat card
+   * chart.Verification for line chart
+   * RecentActivity for activity feed
+   * activeAgent for summary card
 
-* define smart contract methods that CRE will call
-* provide ABI + contract address
-* define event emissions for execution logs
-* optionally validate fingerprint on-chain
 
-````
+
+# 👨‍💻 Blockchain Integration Guide
+
+Blockchain layer expects:
+
+* agent verification triggers
+* optional blockchain sync update
+* backend updates:
+
+  * blockchain_sync_status
+  * blockchain_tx_hash
+
+
+# 🚀 Deployment
+
+Hosted on Render.
+
+Make sure:
+
+* All ENV variables added in Render dashboard.
+* DATABASE_URL uses Supabase pooling URL.
+
+
+# 📈 What Has Been Completed
+
+✅ Identity registry
+✅ Metadata storage
+✅ Logging pipeline
+✅ Simulation sandbox
+✅ Blockchain metadata integration
+✅ Supabase authentication
+✅ JWT verification middleware
+✅ Dashboard analytics layer
+✅ CRE simulation integration
+
+
+# 🔮 Next Phase
+
+* CRE deployment approval
+* On-chain event listeners
+* Real-time dashboard updates
+* WebSocket streaming logs
+* Rate limiting
+* Production RLS hardening
+
+
+# 🧠 Summary
+
+Agentity backend now:
+
+* Uses Supabase Auth securely
+* Tracks all user-agent interactions
+* Provides structured dashboard API
+* Supports blockchain sync
+* Integrates with Chainlink CRE
+* Is production deployable
+
