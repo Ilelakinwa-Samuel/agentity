@@ -13795,22 +13795,36 @@ var sendErrorResponse = (error) => {
   hostBindings.sendResponse(payload);
 };
 var onCronTrigger = async (runtime2) => {
+  const config = runtime2.config;
   const input = {
     agentId: "simulated-agent",
     fingerprint: "simulated-fingerprint",
     riskScore: 0.4
   };
-  runtime2.log("Simulated execution triggered", input);
+  const contractAddress = config?.contractAddress || "not-configured";
+  const network248 = config?.network || "unknown-network";
+  runtime2.log("Simulated execution triggered", {
+    input,
+    contractAddress,
+    network: network248
+  });
   if (input.riskScore >= 0.7) {
     return {
       status: "denied",
       reason: "Risk score too high",
-      agentId: input.agentId
+      agentId: input.agentId,
+      fingerprint: input.fingerprint,
+      contractAddress,
+      network: network248,
+      evaluatedAt: new Date().toISOString()
     };
   }
   return {
     status: "executed",
     agentId: input.agentId,
+    fingerprint: input.fingerprint,
+    contractAddress,
+    network: network248,
     executedAt: new Date().toISOString()
   };
 };
