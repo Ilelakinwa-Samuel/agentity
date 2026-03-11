@@ -15,6 +15,7 @@ const executionRoutes = require("./routes/execution");
 const dashboardRoutes = require("./routes/dashboard");
 const authRoutes = require("./routes/auth");
 const docsRoutes = require("./routes/docs");
+const auditsRoutes = require("./routes/audits");
 
 const app = express();
 
@@ -87,6 +88,7 @@ app.use("/simulation", simulationRoutes);
 app.use("/execute", executionRoutes);
 app.use("/dashboard", dashboardRoutes);
 app.use("/docs", docsRoutes);
+app.use("/audits", auditsRoutes);
 
 /**
  * =============================
