@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 
+const sequelize = require("../config/database");
 const Agent = require("../models/agent");
 const AgentMetadata = require("../models/agentMetadata");
 const AgentReputation = require("../models/agentReputation");
@@ -160,10 +161,13 @@ function normalizeRegisterPayload(body) {
  */
 
 router.post("/register", requireAuth, async (req, res) => {
+  const transaction = await sequelize.transaction();
+
   try {
     const p = normalizeRegisterPayload(req.body || {});
 
     if (!p.agent_name || !p.public_key) {
+      await transaction.rollback();
       return res.status(400).json({
         message:
           "agent_name (or agentName) and public_key (or walletAddress) are required",
@@ -172,9 +176,11 @@ router.post("/register", requireAuth, async (req, res) => {
 
     const existing = await Agent.findOne({
       where: { public_key: p.public_key },
+      transaction,
     });
 
     if (existing) {
+      await transaction.rollback();
       return res.status(409).json({
         message: "Agent already exists",
         agentId: existing.id,
@@ -183,39 +189,51 @@ router.post("/register", requireAuth, async (req, res) => {
 
     const fingerprint = generateFingerprint(p.public_key);
 
-    const agent = await Agent.create({
-      creator_id: req.user.id,
-      agent_name: p.agent_name,
-      public_key: p.public_key,
-      fingerprint,
-    });
-
-    await AgentMetadata.create({
-      agent_id: agent.id,
-      model_name: p.model_name,
-      version: p.version,
-      execution_environment: p.execution_environment,
-    });
-
-    await AgentReputation.create({
-      agent_id: agent.id,
-      score: 0.0,
-      risk_level: "low",
-    });
-
-    await AgentBehaviorLog.create({
-      agent_id: agent.id,
-      event_type: "registration",
-      event_payload: {
-        description: p.description,
-        agentType: p.agent_type,
-        walletAddress: p.public_key,
-        apiEndpoint: p.api_endpoint,
-        metadata: p.metadata_json,
+    const agent = await Agent.create(
+      {
         creator_id: req.user.id,
+        agent_name: p.agent_name,
+        public_key: p.public_key,
+        fingerprint,
       },
-      risk_score: 0.0,
-    });
+      { transaction },
+    );
+
+    await AgentMetadata.create(
+      {
+        agent_id: agent.id,
+        model_name: p.model_name,
+        version: p.version,
+        execution_environment: p.execution_environment,
+      },
+      { transaction },
+    );
+
+    await AgentReputation.create(
+      {
+        agent_id: agent.id,
+        score: 0.0,
+        risk_level: "low",
+      },
+      { transaction },
+    );
+
+    await AgentBehaviorLog.create(
+      {
+        agent_id: agent.id,
+        event_type: "registration",
+        event_payload: {
+          description: p.description,
+          agentType: p.agent_type,
+          walletAddress: p.public_key,
+          apiEndpoint: p.api_endpoint,
+          metadata: p.metadata_json,
+          creator_id: req.user.id,
+        },
+        risk_score: 0.0,
+      },
+      { transaction },
+    );
 
     await logEvent(req, {
       action: "agent_register",
@@ -226,7 +244,10 @@ router.post("/register", requireAuth, async (req, res) => {
         walletAddress: p.public_key,
         apiEndpoint: p.api_endpoint,
       },
+      transaction,
     });
+
+    await transaction.commit();
 
     return res.status(201).json({
       id: agent.id,
@@ -243,6 +264,7 @@ router.post("/register", requireAuth, async (req, res) => {
       createdAt: agent.createdAt,
     });
   } catch (error) {
+    await transaction.rollback();
     console.error(error);
     return res.status(500).json({ message: "Server error" });
   }
@@ -290,7 +312,6 @@ router.get("/user/:userId", async (req, res) => {
   }
 });
 
-// Get Agent Profile
 router.get("/:id", async (req, res) => {
   try {
     const agent = await Agent.findByPk(req.params.id, {
@@ -310,7 +331,6 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-// Verify Agent
 router.post("/:id/verify", async (req, res) => {
   try {
     const agent = await Agent.findByPk(req.params.id);
