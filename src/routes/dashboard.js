@@ -4,7 +4,6 @@ const router = express.Router();
 const { requireAuth } = require("../middleware/auth");
 const { buildDashboard } = require("../services/dashboard/buildDashboard");
 
-
 /**
  * @openapi
  * tags:
@@ -18,7 +17,7 @@ const { buildDashboard } = require("../services/dashboard/buildDashboard");
  *   get:
  *     tags: [Dashboard]
  *     summary: Get dashboard overview for the authenticated user
- *     description: Requires auth (Bearer token or agentity_jwt cookie).
+ *     description: Requires auth (Bearer token or agentity_jwt cookie). The overview is built from the authenticated user's id in the JWT.
  *     security:
  *       - bearerAuth: []
  *       - cookieAuth: []
@@ -30,11 +29,7 @@ const { buildDashboard } = require("../services/dashboard/buildDashboard");
  */
 router.get("/overview", requireAuth, async (req, res, next) => {
   try {
-    const userId = req.user.id;
-    const email = req.user.email;
-    const name = req.user?.user_metadata?.name || req.user?.user_metadata?.full_name || "";
-
-    const dashboard = await buildDashboard(userId, email, name);
+    const dashboard = await buildDashboard(req.user);
     res.json(dashboard);
   } catch (err) {
     next(err);

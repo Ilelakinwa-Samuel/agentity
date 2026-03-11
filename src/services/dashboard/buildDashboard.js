@@ -1,4 +1,3 @@
-// src/services/dashboard/buildDashboard.js
 const { Op, fn, col } = require("sequelize");
 const UserAgentEvent = require("../../models/userAgentEvent");
 const Agent = require("../../models/agent");
@@ -23,7 +22,9 @@ function isVulnerability(payload) {
 
 function startOfDayUTC(d) {
   const x = new Date(d);
-  return new Date(Date.UTC(x.getUTCFullYear(), x.getUTCMonth(), x.getUTCDate()));
+  return new Date(
+    Date.UTC(x.getUTCFullYear(), x.getUTCMonth(), x.getUTCDate()),
+  );
 }
 
 function dateLabel(d) {
@@ -55,6 +56,7 @@ async function buildDashboard(user, options = {}) {
   const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
   const [
+    totalAgent,
     totalVerifiedAgent,
     activeSimulation,
     transactionsExecuted,
@@ -63,8 +65,12 @@ async function buildDashboard(user, options = {}) {
     events7d,
     lastTouchedEvent,
   ] = await Promise.all([
-    UserAgentEvent.count({
-      where: { user_id: userId, action: "agent_verify" },
+    Agent.count({
+      where: { creator_id: userId },
+    }),
+
+    Agent.count({
+      where: { creator_id: userId, status: "verified" },
     }),
 
     UserAgentEvent.count({
@@ -102,17 +108,12 @@ async function buildDashboard(user, options = {}) {
     }),
   ]);
 
-  const agentIds = touchedAgentsDistinct
-    .map((r) => r.get("agent_id"))
-    .filter(Boolean);
-
-  const totalAgent = agentIds.length;
-
   let activeAgent = null;
   if (lastTouchedEvent?.agent_id) {
     activeAgent = await Agent.findByPk(lastTouchedEvent.agent_id, {
       attributes: [
         "id",
+        "creator_id",
         "agent_name",
         "status",
         "fingerprint",
@@ -127,7 +128,6 @@ async function buildDashboard(user, options = {}) {
 
   const verificationSeries = Array(7).fill(0);
   const vulnerabilitySeries = Array(7).fill(0);
-
   let vulnerabilitiesDetected = 0;
 
   for (const ev of events7d) {
@@ -164,8 +164,11 @@ async function buildDashboard(user, options = {}) {
       action: e.action,
       agent_id: e.agent_id,
       payload: e.payload,
-      createdAt: e.created_at, // keep frontend contract
+      createdAt: e.created_at,
     })),
+    interactedAgentIds: touchedAgentsDistinct
+      .map((r) => r.get("agent_id"))
+      .filter(Boolean),
   };
 }
 

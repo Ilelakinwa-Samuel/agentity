@@ -1,4 +1,3 @@
-// src/models/agent.js
 const { DataTypes, Op } = require("sequelize");
 const sequelize = require("../config/database");
 
@@ -9,6 +8,10 @@ const Agent = sequelize.define(
       type: DataTypes.UUID,
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
+    },
+    creator_id: {
+      type: DataTypes.UUID,
+      allowNull: false,
     },
     agent_name: {
       type: DataTypes.STRING,
@@ -28,8 +31,6 @@ const Agent = sequelize.define(
       type: DataTypes.ENUM("pending", "verified", "suspended"),
       defaultValue: "pending",
     },
-
-    // Blockchain Integration Fields (Avalanche C-Chain)
     blockchain_agent_id: {
       type: DataTypes.INTEGER,
       allowNull: true,
@@ -59,6 +60,7 @@ const Agent = sequelize.define(
   {
     timestamps: true,
     indexes: [
+      { fields: ["creator_id"] },
       {
         fields: ["blockchain_agent_id"],
         unique: true,

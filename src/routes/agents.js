@@ -6,6 +6,7 @@ const AgentMetadata = require("../models/agentMetadata");
 const AgentReputation = require("../models/agentReputation");
 const AgentBehaviorLog = require("../models/agentBehaviorLog");
 
+const { requireAuth } = require("../middleware/auth");
 const { generateFingerprint } = require("../services/fingerprint");
 const { logEvent } = require("../services/audit/logEvent");
 
@@ -22,13 +23,10 @@ function parseJsonMaybe(value) {
 }
 
 function normalizeRegisterPayload(body) {
-  // Support both snake_case and camelCase from frontend
   const agent_name = body.agent_name || body.agentName || body.name || null;
   const description = body.description || null;
   const agent_type = body.agent_type || body.agentType || null;
 
-  // Frontend uses walletAddress. Your system uses public_key.
-  // We map walletAddress -> public_key to avoid schema changes.
   const public_key =
     body.public_key ||
     body.publicKey ||
@@ -38,7 +36,6 @@ function normalizeRegisterPayload(body) {
 
   const api_endpoint = body.api_endpoint || body.apiEndpoint || null;
 
-  // Old fields still supported (no conflict)
   const model_name =
     body.model_name || body.modelName || agent_type || "unknown";
   const version = body.version || "unknown";
@@ -64,7 +61,6 @@ function normalizeRegisterPayload(body) {
   };
 }
 
-
 /**
  * @openapi
  * tags:
@@ -77,8 +73,11 @@ function normalizeRegisterPayload(body) {
  * /agents/register:
  *   post:
  *     tags: [Agents]
- *     summary: Register agent (accepts frontend form fields)
- *     description: Supports both camelCase and snake_case fields.
+ *     summary: Register agent and tie it to the authenticated user
+ *     description: Supports both camelCase and snake_case fields. Requires auth.
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -98,8 +97,36 @@ function normalizeRegisterPayload(body) {
  *     responses:
  *       201:
  *         description: Agent created
+ *       401:
+ *         description: Unauthorized
  *       409:
  *         description: Agent already exists
+ *
+ * /agents/my:
+ *   get:
+ *     tags: [Agents]
+ *     summary: Get agents registered by the authenticated user
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     responses:
+ *       200:
+ *         description: List of current user's agents
+ *       401:
+ *         description: Unauthorized
+ *
+ * /agents/user/{userId}:
+ *   get:
+ *     tags: [Agents]
+ *     summary: Get agents registered by a given user id
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: List of that user's agents
  *
  * /agents/{id}:
  *   get:
@@ -132,8 +159,7 @@ function normalizeRegisterPayload(body) {
  *         description: Not found
  */
 
-
-router.post("/register", async (req, res) => {
+router.post("/register", requireAuth, async (req, res) => {
   try {
     const p = normalizeRegisterPayload(req.body || {});
 
@@ -147,22 +173,23 @@ router.post("/register", async (req, res) => {
     const existing = await Agent.findOne({
       where: { public_key: p.public_key },
     });
+
     if (existing) {
-      return res
-        .status(409)
-        .json({ message: "Agent already exists", agentId: existing.id });
+      return res.status(409).json({
+        message: "Agent already exists",
+        agentId: existing.id,
+      });
     }
 
     const fingerprint = generateFingerprint(p.public_key);
 
     const agent = await Agent.create({
+      creator_id: req.user.id,
       agent_name: p.agent_name,
       public_key: p.public_key,
       fingerprint,
     });
 
-    // Keep existing tables unchanged:
-    // Store structured form fields in AgentMetadata via existing columns (best-effort)
     await AgentMetadata.create({
       agent_id: agent.id,
       model_name: p.model_name,
@@ -176,7 +203,6 @@ router.post("/register", async (req, res) => {
       risk_level: "low",
     });
 
-    // Persist the extra form fields safely (JSONB) without altering schema
     await AgentBehaviorLog.create({
       agent_id: agent.id,
       event_type: "registration",
@@ -186,6 +212,7 @@ router.post("/register", async (req, res) => {
         walletAddress: p.public_key,
         apiEndpoint: p.api_endpoint,
         metadata: p.metadata_json,
+        creator_id: req.user.id,
       },
       risk_score: 0.0,
     });
@@ -201,9 +228,9 @@ router.post("/register", async (req, res) => {
       },
     });
 
-    // Return a frontend-friendly response (no conflicts)
     return res.status(201).json({
       id: agent.id,
+      creator_id: agent.creator_id,
       agent_name: agent.agent_name,
       fingerprint: agent.fingerprint,
       public_key: agent.public_key,
@@ -217,6 +244,48 @@ router.post("/register", async (req, res) => {
     });
   } catch (error) {
     console.error(error);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+router.get("/my", requireAuth, async (req, res) => {
+  try {
+    const agents = await Agent.findAll({
+      where: { creator_id: req.user.id },
+      include: [
+        { model: AgentMetadata, as: "metadata" },
+        { model: AgentReputation, as: "reputation" },
+      ],
+      order: [["createdAt", "DESC"]],
+    });
+
+    return res.json({
+      userId: req.user.id,
+      total: agents.length,
+      agents,
+    });
+  } catch (error) {
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+router.get("/user/:userId", async (req, res) => {
+  try {
+    const agents = await Agent.findAll({
+      where: { creator_id: req.params.userId },
+      include: [
+        { model: AgentMetadata, as: "metadata" },
+        { model: AgentReputation, as: "reputation" },
+      ],
+      order: [["createdAt", "DESC"]],
+    });
+
+    return res.json({
+      userId: req.params.userId,
+      total: agents.length,
+      agents,
+    });
+  } catch (error) {
     return res.status(500).json({ message: "Server error" });
   }
 });
@@ -245,6 +314,7 @@ router.get("/:id", async (req, res) => {
 router.post("/:id/verify", async (req, res) => {
   try {
     const agent = await Agent.findByPk(req.params.id);
+
     if (!agent) return res.status(404).json({ message: "Agent not found" });
 
     agent.status = "verified";

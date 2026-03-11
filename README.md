@@ -84,32 +84,163 @@ Frontend must send cookies:
 
 ## Core Backend Routes
 
+### Auth
+
+Endpoints:
+
+* `POST /auth/register`
+* `POST /auth/login`
+* `POST /auth/logout`
+
+Auth returns:
+
+* `jwt` (Supabase access_token)
+* Sets `agentity_jwt` httpOnly cookie
+
+All protected endpoints accept either:
+
+* `Authorization: Bearer <jwt>`
+* `agentity_jwt` cookie
+
+---
+
 ### Agents
 
-* `POST /agents/register`
+Agents are now **owned by the authenticated user**.
+
+Each agent is stored with:
+
+```
+creator_id → Supabase user id
+```
+
+Endpoints:
+
+* `POST /agents/register` (requires auth)
+* `GET /agents/my` (get agents registered by authenticated user)
+* `GET /agents/user/:userId` (get agents registered by a specific user)
 * `GET /agents/:id`
 * `POST /agents/:id/verify`
 
+Agent registration automatically stores:
+
+```
+creator_id = req.user.id
+```
+
+This allows:
+
+* user-specific dashboards
+* ownership tracking
+* filtering agents by creator
+
+---
+
 ### Simulation
 
-* `POST /simulation/:id`
+```
+POST /simulation/:id
+```
+
+Runs a sandbox simulation for the agent and records the result in the audit logs.
+
+---
 
 ### Execution
 
-* `POST /execute/:id`
+```
+POST /execute/:id
+```
 
-Execution flow:
+Execution pipeline:
 
-* Runs sandbox simulation first
-* Then runs CRE execution (or **fallback** if CRE webhook is not configured)
+```
+Agent → Sandbox Simulation → CRE Workflow → Execution Result
+```
+
+Steps:
+
+1. Agent must be **verified**
+2. Sandbox simulation runs
+3. CRE workflow evaluates the execution
+4. Result is logged to the database
+5. Optional blockchain action logging
+
+If CRE webhook is not configured:
+
+```
+execution falls back to local execution response
+```
+
+---
 
 ### Dashboard
 
-* `GET /dashboard/overview` (requires auth)
+```
+GET /dashboard/overview
+```
+
+Requires authentication.
+
+Dashboard data is **built from the authenticated user inside the JWT**.
+
+The backend extracts the user from:
+
+```
+req.user.id
+req.user.email
+req.user.user_metadata
+```
+
+The dashboard aggregates:
+
+* agents created by the user
+* agent verification count
+* simulation activity
+* execution activity
+* vulnerability detections
+* recent user activity
+
+Example response:
+
+```json
+{
+  "email": "user@mail.com",
+  "name": "John Doe",
+  "Totalagent": 3,
+  "TotalvarifiedAgent": 2,
+  "activeSimulation": 1,
+  "VulnerabilitiesDetected": 0,
+  "TransactionsExecuted": 4,
+  "chart": {
+    "labels": ["2026-03-01","2026-03-02"],
+    "Verification": [1,1],
+    "Vulnerability": [0,0]
+  },
+  "activeAgent": {},
+  "RecentActivity": []
+}
+```
+
+---
 
 ### Health
 
-* `GET /health`
+```
+GET /health
+```
+
+Returns service status and database connectivity.
+
+Example:
+
+```json
+{
+  "status": "healthy",
+  "database": "connected",
+  "uptime": 124.23
+}
+```
 
 ## Chainlink CRE (Local Simulation)
 
