@@ -13,9 +13,9 @@ function setAuthCookie(res, jwt) {
 
   res.cookie("agentity_jwt", jwt, {
     httpOnly: true,
-    secure: isProd, // Render is HTTPS => true in production
-    sameSite: isProd ? "none" : "lax", // cross-site cookie for Render + separate frontend domain
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    secure: isProd,
+    sameSite: isProd ? "none" : "lax",
+    maxAge: 7 * 24 * 60 * 60 * 1000,
     path: "/",
   });
 }
@@ -24,7 +24,7 @@ function setAuthCookie(res, jwt) {
  * @openapi
  * tags:
  *   - name: Auth
- *     description: Supabase Auth (sets httpOnly cookie agentity_jwt)
+ *     description: Supabase Auth (sets and clears httpOnly cookie agentity_jwt)
  */
 
 /**
@@ -41,9 +41,15 @@ function setAuthCookie(res, jwt) {
  *             type: object
  *             required: [email, password, name]
  *             properties:
- *               email: { type: string, example: "user@mail.com" }
- *               password: { type: string, example: "Password123!" }
- *               name: { type: string, example: "John Doe" }
+ *               email:
+ *                 type: string
+ *                 example: "user@mail.com"
+ *               password:
+ *                 type: string
+ *                 example: "Password123!"
+ *               name:
+ *                 type: string
+ *                 example: "John Doe"
  *     responses:
  *       201:
  *         description: Created
@@ -51,7 +57,10 @@ function setAuthCookie(res, jwt) {
  *         description: Bad request
  *       401:
  *         description: Invalid credentials
- *
+ */
+
+/**
+ * @openapi
  * /auth/login:
  *   post:
  *     tags: [Auth]
@@ -64,8 +73,12 @@ function setAuthCookie(res, jwt) {
  *             type: object
  *             required: [email, password]
  *             properties:
- *               email: { type: string, example: "user@mail.com" }
- *               password: { type: string, example: "Password123!" }
+ *               email:
+ *                 type: string
+ *                 example: "user@mail.com"
+ *               password:
+ *                 type: string
+ *                 example: "Password123!"
  *     responses:
  *       200:
  *         description: OK
@@ -75,6 +88,29 @@ function setAuthCookie(res, jwt) {
  *         description: Invalid credentials
  */
 
+/**
+ * @openapi
+ * /auth/logout:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Logout user
+ *     description: Clears the agentity_jwt httpOnly cookie. Frontend should also remove any locally stored JWT after this call.
+ *     responses:
+ *       200:
+ *         description: Logout successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Signed out successfully"
+ */
+
 router.post("/register", async (req, res, next) => {
   try {
     const { email, password, name } = req.body || {};
@@ -82,16 +118,13 @@ router.post("/register", async (req, res, next) => {
       return badRequest(res, "email, password, and name are required");
     }
 
-    // Create user with confirmed email to allow immediate session issuance
-    const { data: created, error: createErr } =
-      await supabaseAdmin.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: true,
-        user_metadata: { name },
-      });
+    const { error: createErr } = await supabaseAdmin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: { name },
+    });
 
-    // If user exists, treat it as idempotent and attempt login
     if (createErr) {
       const msg = (createErr.message || "").toLowerCase();
       const already =
@@ -107,7 +140,9 @@ router.post("/register", async (req, res, next) => {
     const { data: signedIn, error: signInErr } =
       await supabaseAuth.auth.signInWithPassword({ email, password });
 
-    if (signInErr) return res.status(401).json({ message: signInErr.message });
+    if (signInErr) {
+      return res.status(401).json({ message: signInErr.message });
+    }
 
     const jwt = signedIn?.session?.access_token;
     const user = signedIn?.user;
@@ -125,7 +160,7 @@ router.post("/register", async (req, res, next) => {
     return res.status(201).json({
       email: user.email,
       name: user?.user_metadata?.name || name,
-      jwt, // keep in body for hackathon speed; frontend can ignore once cookie works
+      jwt,
       dashboard,
     });
   } catch (err) {
@@ -145,7 +180,9 @@ router.post("/login", async (req, res, next) => {
       password,
     });
 
-    if (error) return res.status(401).json({ message: error.message });
+    if (error) {
+      return res.status(401).json({ message: error.message });
+    }
 
     const jwt = data.session?.access_token;
     const user = data.user;
@@ -166,7 +203,7 @@ router.post("/login", async (req, res, next) => {
     return res.json({
       email: user.email,
       name,
-      jwt, // keep for now; cookie is primary
+      jwt,
       dashboard,
     });
   } catch (err) {
@@ -175,8 +212,19 @@ router.post("/login", async (req, res, next) => {
 });
 
 router.post("/logout", async (req, res) => {
-  res.clearCookie("agentity_jwt", { path: "/" });
-  res.json({ ok: true });
+  const isProd = process.env.NODE_ENV === "production";
+
+  res.clearCookie("agentity_jwt", {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: isProd ? "none" : "lax",
+    path: "/",
+  });
+
+  return res.json({
+    ok: true,
+    message: "Signed out successfully",
+  });
 });
 
 module.exports = router;
