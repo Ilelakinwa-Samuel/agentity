@@ -42,6 +42,8 @@ const { logEvent } = require("../services/audit/logEvent");
  *     responses:
  *       200:
  *         description: Linked wallet
+ *       400:
+ *         description: Invalid input
  *       401:
  *         description: Unauthorized
  *       404:
@@ -49,17 +51,23 @@ const { logEvent } = require("../services/audit/logEvent");
  */
 router.post("/link", requireAuth, async (req, res, next) => {
   try {
-    const { agentId, hederaAccountId, hederaPublicKey, kmsKeyId } = req.body || {};
+    const { agentId, hederaAccountId, hederaPublicKey, kmsKeyId } =
+      req.body || {};
 
-    if (!agentId || !hederaAccountId || !hederaPublicKey) {
-      return res
-        .status(400)
-        .json({ message: "agentId, hederaAccountId, and hederaPublicKey are required" });
+    const trimmedAgentId = agentId?.trim();
+    const trimmedHederaAccountId = hederaAccountId?.trim();
+    const trimmedHederaPublicKey = hederaPublicKey?.trim();
+    const trimmedKmsKeyId = kmsKeyId?.trim();
+
+    if (!trimmedAgentId || !trimmedHederaAccountId || !trimmedHederaPublicKey) {
+      return res.status(400).json({
+        message: "agentId, hederaAccountId, and hederaPublicKey are required",
+      });
     }
 
     const agent = await Agent.findOne({
       where: {
-        id: agentId,
+        id: trimmedAgentId,
         creator_id: req.user.id,
       },
     });
@@ -68,23 +76,27 @@ router.post("/link", requireAuth, async (req, res, next) => {
       return res.status(404).json({ message: "Agent not found for this user" });
     }
 
-    const [wallet] = await AgentWallet.upsert(
+    await AgentWallet.upsert(
       {
         agent_id: agent.id,
-        hedera_account_id: hederaAccountId,
-        hedera_public_key: hederaPublicKey,
-        kms_key_id: kmsKeyId || null,
+        hedera_account_id: trimmedHederaAccountId,
+        hedera_public_key: trimmedHederaPublicKey,
+        kms_key_id: trimmedKmsKeyId || null,
         status: "linked",
       },
-      { returning: true }
+      { returning: true },
     );
+
+    const wallet = await AgentWallet.findOne({
+      where: { agent_id: agent.id },
+    });
 
     await logEvent(req, {
       action: "wallet_link",
       agentId: agent.id,
       payload: {
-        hederaAccountId,
-        kmsKeyId: kmsKeyId || null,
+        hederaAccountId: trimmedHederaAccountId,
+        kmsKeyId: trimmedKmsKeyId || null,
       },
     });
 
