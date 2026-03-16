@@ -48,7 +48,7 @@ const { logEvent } = require("../services/audit/logEvent");
  *               inputPayload:
  *                 type: object
  *     responses:
- *       200:
+ *       201:
  *         description: Task created
  */
 router.post("/request", requireAuth, async (req, res, next) => {
@@ -59,7 +59,12 @@ router.post("/request", requireAuth, async (req, res, next) => {
       return res.status(400).json({ message: "agentId and taskType are required" });
     }
 
-    const agent = await Agent.findByPk(agentId);
+    const agent = await Agent.findOne({
+      where: {
+        id: agentId,
+        creator_id: req.user.id,
+      },
+    });
 
     if (!agent) {
       return res.status(404).json({ message: "Agent not found" });
@@ -82,7 +87,7 @@ router.post("/request", requireAuth, async (req, res, next) => {
       },
     });
 
-    return res.json({
+    return res.status(201).json({
       id: task.id,
       agentId: task.agent_id,
       taskType: task.task_type,
@@ -125,7 +130,17 @@ router.post("/:id/simulate", requireAuth, async (req, res, next) => {
       return res.status(404).json({ message: "Task not found" });
     }
 
-    const agent = await Agent.findByPk(task.agent_id);
+    const agent = await Agent.findOne({
+      where: {
+        id: task.agent_id,
+        creator_id: req.user.id,
+      },
+    });
+
+    if (!agent) {
+      return res.status(404).json({ message: "Agent not found" });
+    }
+
     const sandboxResult = await simulateAgent(agent.id);
 
     const riskScore =
@@ -242,7 +257,7 @@ router.post("/:id/pay", requireAuth, async (req, res, next) => {
     return res.json({
       taskId: task.id,
       paymentId: result.payment.id,
-      amountHbar: result.payment.amount_hbar,
+      amountHbar: Number(result.payment.amount_hbar),
       hederaTxId: result.txId,
       simulated: result.simulated,
       status: "paid",
@@ -284,10 +299,22 @@ router.post("/:id/execute", requireAuth, async (req, res, next) => {
     }
 
     if (!["paid", "simulated"].includes(task.status)) {
-      return res.status(400).json({ message: "Task must be simulated and/or paid before execution" });
+      return res.status(400).json({
+        message: "Task must be simulated and/or paid before execution",
+      });
     }
 
-    const agent = await Agent.findByPk(task.agent_id);
+    const agent = await Agent.findOne({
+      where: {
+        id: task.agent_id,
+        creator_id: req.user.id,
+      },
+    });
+
+    if (!agent) {
+      return res.status(404).json({ message: "Agent not found" });
+    }
+
     const wallet = await AgentWallet.findOne({
       where: { agent_id: agent.id, status: "linked" },
     });
@@ -298,7 +325,10 @@ router.post("/:id/execute", requireAuth, async (req, res, next) => {
       ? await SimulationRun.findByPk(task.simulation_run_id)
       : null;
 
-    const executionResult = await executeWithCRE(agent, simulationResult?.result_payload || {});
+    const executionResult = await executeWithCRE(
+      agent,
+      simulationResult?.result_payload || {},
+    );
 
     const kmsResult = await signPayloadWithKms({
       userId: req.user.id,
@@ -386,7 +416,7 @@ router.get("/history", requireAuth, async (req, res, next) => {
         payment: task.payment
           ? {
               id: task.payment.id,
-              amountHbar: task.payment.amount_hbar,
+              amountHbar: Number(task.payment.amount_hbar),
               status: task.payment.status,
               hederaTxId: task.payment.hedera_tx_id,
             }
