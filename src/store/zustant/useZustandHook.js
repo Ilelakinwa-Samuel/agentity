@@ -11,6 +11,7 @@ export const authentication = create((set) => ({
   smartContracts: [],
   user: null,
   audit:[],
+  tasksHistory: [],
 
   registerUser: async (payload) => {
     try {
@@ -226,6 +227,27 @@ signOut: async () => {
           });
           toast.error("Failed to link wallet", { id: "link-wallet" });
         }
+      },
+      getTasksHistory: async () => {
+        try {
+          set({ loading: true, error: null });
+          const res = await api.get("/tasks/history");
+
+          if (!res || res.status < 200 || res.status >= 300) {
+            toast.error("Failed to load tasks history, please try again", { id: "load-tasks-history" });
+            set({ loading: false ,});
+            return;
+          }
+         toast.success("Tasks history loaded!", { id: "load-tasks-history" });
+          set({ loading: false, tasksHistory: res.data });
+        } catch (err) {
+          set({
+            loading: false,
+            error: err?.response?.data?.message ?? "Failed to load tasks history",
+          });
+          toast.error("Failed to load tasks history", { id: "load-tasks-history" });
+        }
       }
+
 
 }));

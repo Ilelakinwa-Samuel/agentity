@@ -1,6 +1,6 @@
 function Finished() {
   return (
-    <div>Finished</div>
+    <div>completed</div>
   )
 }
 

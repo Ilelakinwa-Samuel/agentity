@@ -10,17 +10,16 @@ import { authentication } from "./store/zustant/useZustandHook.js";
 import Task from "./pages/Task.jsx";
 
 function App() {
-  const { dashBoard, getDashboard , audit, getAudit} = authentication();
+  const { dashBoard, getDashboard , getTasksHistory,tasksHistory} = authentication();
 
   useEffect(() => {
     const loadDashboard = async () => {
       await getDashboard();
-      await getAudit();
+      await  getTasksHistory();
     };
     loadDashboard();
-  }, [getDashboard, getAudit]);
-console.log("Dashboard data:", dashBoard);
-console.log("Audit data:", audit);
+  }, [getDashboard,  getTasksHistory]);
+  console.log("tasksHistory in App.jsx:", tasksHistory);
   return (
     <>
       <Toaster
