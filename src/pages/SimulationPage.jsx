@@ -25,11 +25,11 @@ function SimulationPage() {
   function handleChange(e) {
     const selected = e.target.value;
     setAction(selected);
-    console.log("Selected:", selected);
+   
   }
 
   const selected = agents?.find((agent) => agent.id === action);
-  console.log("Selected agent details:", selected);
+
 
   return (
     <AppLayout>

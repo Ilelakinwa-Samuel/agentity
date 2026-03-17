@@ -19,7 +19,7 @@ function App() {
     };
     loadDashboard();
   }, [getDashboard,  getTasksHistory]);
-  console.log("tasksHistory in App.jsx:", tasksHistory);
+
   return (
     <>
       <Toaster

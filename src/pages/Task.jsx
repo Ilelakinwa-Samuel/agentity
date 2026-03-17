@@ -16,7 +16,7 @@ function Task() {
         console.error("Failed to load agents", e);
       }
     }, [getUserAgents]);
-  console.log("Agents in SmartContract page:", agents);
+
 
   return (
     <AppLayout>

@@ -49,10 +49,9 @@ export const authentication = create((set) => ({
 
       const res = await api.post("/auth/login", payload);
 
-      console.log("Login response:", res.status, res.data);
 
       if (!res || res.status < 200 || res.status >= 300) {
-        alert("Login failed, please try again");
+        toast.error("Login failed, please try again");
         set({ loading: false });
         return;
       }
