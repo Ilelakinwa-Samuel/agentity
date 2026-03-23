@@ -16,7 +16,7 @@ const dashboardRoutes = require("./routes/dashboard");
 const authRoutes = require("./routes/auth");
 const docsRoutes = require("./routes/docs");
 const auditsRoutes = require("./routes/audits");
-const walletRoutes = require("./routes/wallets");
+// const walletRoutes = require("./routes/wallets");
 const taskRoutes = require("./routes/tasks");
 const paymentRoutes = require("./routes/payments");
 
@@ -91,7 +91,7 @@ app.use("/dashboard", dashboardRoutes);
 app.use("/docs", docsRoutes);
 app.use("/audits", auditsRoutes);
 app.use("/wallets", walletRoutes);
-app.use("/tasks", taskRoutes);
+// app.use("/tasks", taskRoutes);
 app.use("/payments", paymentRoutes);
 
 /**
