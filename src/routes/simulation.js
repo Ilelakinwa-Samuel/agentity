@@ -43,12 +43,57 @@ router.get("/scenarios", (req, res) => {
  *   get:
  *     tags: [Simulation]
  *     summary: Get simulation history for authenticated user
+ *     description: Returns simulation history for the logged-in user.
  *     security:
  *       - bearerAuth: []
  *       - cookieAuth: []
  *     responses:
  *       200:
  *         description: Simulation history
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 items:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                         example: "7b2f4b1a-0f2e-4b5a-bdb5-2d0f52ed7c5e"
+ *                       agentId:
+ *                         type: string
+ *                         example: "ac0d21d5-bb02-4d52-8004-4725488cf007"
+ *                       agentName:
+ *                         nullable: true
+ *                         type: string
+ *                         example: "Treasury Risk Monitor"
+ *                       scenario:
+ *                         type: string
+ *                         example: "Oracle Query"
+ *                       riskScore:
+ *                         type: number
+ *                         example: 35
+ *                       vulnerabilities:
+ *                         type: integer
+ *                         example: 1
+ *                       status:
+ *                         type: string
+ *                         example: "completed"
+ *                       createdAt:
+ *                         type: string
+ *                         format: date-time
+ *                         example: "2026-03-16T15:40:00.000Z"
+ *                       result:
+ *                         type: object
+ *                         additionalProperties: true
+ *                         example:
+ *                           summary: "Simulation completed successfully"
+ *                           sandbox:
+ *                             riskScore: 35
+ *                             findings: []
  *       401:
  *         description: Unauthorized
  */

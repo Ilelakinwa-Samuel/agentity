@@ -377,12 +377,62 @@ router.post("/:id/execute", requireAuth, async (req, res, next) => {
  *   get:
  *     tags: [Tasks]
  *     summary: Get task history for authenticated user
+ *     description: Returns task execution history for the logged-in user.
  *     security:
  *       - bearerAuth: []
  *       - cookieAuth: []
  *     responses:
  *       200:
  *         description: Task history
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 items:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                         example: "9e75f7fd-fd1c-4b6d-91ab-3ecdb9d8d222"
+ *                       agentId:
+ *                         type: string
+ *                         example: "ac0d21d5-bb02-4d52-8004-4725488cf007"
+ *                       agentName:
+ *                         nullable: true
+ *                         type: string
+ *                         example: "Treasury Risk Monitor"
+ *                       taskType:
+ *                         type: string
+ *                         example: "execution"
+ *                       status:
+ *                         type: string
+ *                         example: "completed"
+ *                       payment:
+ *                         nullable: true
+ *                         type: object
+ *                         properties:
+ *                           id:
+ *                             type: string
+ *                             example: "1d95072e-c995-4ecf-8f1a-5db5a3d8a111"
+ *                           amountHbar:
+ *                             type: number
+ *                             example: 1.5
+ *                           status:
+ *                             type: string
+ *                             example: "paid"
+ *                           hederaTxId:
+ *                             nullable: true
+ *                             type: string
+ *                             example: "0.0.7148109@1710601234.123456789"
+ *                       createdAt:
+ *                         type: string
+ *                         format: date-time
+ *                         example: "2026-03-16T15:50:00.000Z"
+ *       401:
+ *         description: Unauthorized
  */
 router.get("/history", requireAuth, async (req, res, next) => {
   try {
