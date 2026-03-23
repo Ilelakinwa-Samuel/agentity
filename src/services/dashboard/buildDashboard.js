@@ -13,6 +13,7 @@ function isVulnerability(payload) {
   const risk = parseRiskScore(payload);
   const status =
     typeof payload?.status === "string" ? payload.status.toLowerCase() : "";
+
   return (
     (typeof risk === "number" && risk >= 0.7) ||
     status.includes("denied") ||
@@ -34,11 +35,13 @@ function dateLabel(d) {
 function lastNDaysLabels(n) {
   const today = startOfDayUTC(new Date());
   const labels = [];
+
   for (let i = n - 1; i >= 0; i -= 1) {
     const d = new Date(today);
     d.setUTCDate(d.getUTCDate() - i);
     labels.push(dateLabel(d));
   }
+
   return labels;
 }
 
@@ -61,7 +64,6 @@ async function buildDashboard(user, options = {}) {
     activeSimulation,
     transactionsExecuted,
     recentActivity,
-    touchedAgentsDistinct,
     events7d,
     lastTouchedEvent,
   ] = await Promise.all([
@@ -82,7 +84,10 @@ async function buildDashboard(user, options = {}) {
     }),
 
     UserAgentEvent.count({
-      where: { user_id: userId, action: "agent_execute" },
+      where: {
+        user_id: userId,
+        action: "agent_execute",
+      },
     }),
 
     UserAgentEvent.findAll({
@@ -92,28 +97,29 @@ async function buildDashboard(user, options = {}) {
     }),
 
     UserAgentEvent.findAll({
-      where: { user_id: userId, agent_id: { [Op.ne]: null } },
-      attributes: [[fn("DISTINCT", col("agent_id")), "agent_id"]],
-    }),
-
-    UserAgentEvent.findAll({
-      where: { user_id: userId, created_at: { [Op.gte]: since7d } },
+      where: {
+        user_id: userId,
+        created_at: { [Op.gte]: since7d },
+      },
       attributes: ["action", "payload", "created_at"],
       order: [["created_at", "ASC"]],
     }),
 
     UserAgentEvent.findOne({
-      where: { user_id: userId, agent_id: { [Op.ne]: null } },
+      where: {
+        user_id: userId,
+        agent_id: { [Op.ne]: null },
+      },
       order: [["created_at", "DESC"]],
     }),
   ]);
 
   let activeAgent = null;
+
   if (lastTouchedEvent?.agent_id) {
     activeAgent = await Agent.findByPk(lastTouchedEvent.agent_id, {
       attributes: [
         "id",
-        "creator_id",
         "agent_name",
         "status",
         "fingerprint",
@@ -134,7 +140,9 @@ async function buildDashboard(user, options = {}) {
     const idx = labels.indexOf(dateLabel(ev.created_at));
     if (idx === -1) continue;
 
-    if (ev.action === "agent_verify") verificationSeries[idx] += 1;
+    if (ev.action === "agent_verify") {
+      verificationSeries[idx] += 1;
+    }
 
     if (ev.action === "agent_simulate") {
       const vuln = isVulnerability(ev.payload);
@@ -166,9 +174,6 @@ async function buildDashboard(user, options = {}) {
       payload: e.payload,
       createdAt: e.created_at,
     })),
-    interactedAgentIds: touchedAgentsDistinct
-      .map((r) => r.get("agent_id"))
-      .filter(Boolean),
   };
 }
 
