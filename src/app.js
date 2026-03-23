@@ -90,8 +90,8 @@ app.use("/execute", executionRoutes);
 app.use("/dashboard", dashboardRoutes);
 app.use("/docs", docsRoutes);
 app.use("/audits", auditsRoutes);
-app.use("/wallets", walletRoutes);
-// app.use("/tasks", taskRoutes);
+// app.use("/wallets", walletRoutes);
+app.use("/tasks", taskRoutes);
 app.use("/payments", paymentRoutes);
 
 /**
