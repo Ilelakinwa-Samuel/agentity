@@ -1,7 +1,6 @@
 import { Bot, Cross, Plus } from "lucide-react";
 import AppLayout from "../layouts/AppLayouts";
 import RegisteredAgent from "../components/agent/RegisteredAgent";
-import registeredAgent from "../constants/registeredAgent";
 import Modal from "../components/model/Modal";
 import NewAgentPopUp from "../components/popups/NewAgentPopUp";
 import { useEffect, useState } from "react";
@@ -83,12 +82,12 @@ function AiAgent() {
                 </tr>
               </thead>
               <tbody>
-                {agents.map((agent) => (
+                {agents&&(agents.map((agent) => (
                   <RegisteredAgent key={agent.id} id={agent.id} type={"agent"} name={agent.agent_name} 
                     lastActive={formatDate(agent.updatedAt)} status={agent.status}
                     reputation={agent.reputation.score}
                     />
-                ))}
+                )))}
               </tbody>
             </table>
           </div>

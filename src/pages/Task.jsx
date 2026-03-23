@@ -8,8 +8,7 @@ function Task() {
   const [open, setOpen] = useState(false);
   const {agents,getUserAgents} = authentication();
 
-  useEffect
-  (() => {
+  useEffect(() => {
       try {
        getUserAgents();
       } catch (e) {
@@ -17,7 +16,7 @@ function Task() {
       }
     }, [getUserAgents]);
 
-
+  
   return (
     <AppLayout>
       <div className="mb-6 flex items-center justify-between rounded-lg p-4">
@@ -33,12 +32,13 @@ function Task() {
           onClick={() => setOpen(true)}
         >
           <Plus className="mr-2" size={20} />
-          <span>Link Wallet</span>
+          <span>Add Task </span>
         </button>
 
         < HederaAgentFormModal
           isOpen={open}
           onClose={() => setOpen(false)}
+          agents={agents}
         />
       </div>
     </AppLayout>

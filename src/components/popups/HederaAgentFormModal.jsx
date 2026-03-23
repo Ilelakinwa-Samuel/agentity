@@ -1,38 +1,60 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { authentication } from "../../store/zustant/useZustandHook";
 
-const initialForm = {
+const INITIAL_FORM = {
   agentId: "",
-  hederaAccountId: "0.0.123456",
+  hederaAccountId: "",
   hederaPublicKey: "",
   kmsKeyId: "",
+  taskType: "execution",
+  action: "swap_tokens",
+  fromToken: "",
+  toToken: "",
+  amount: "",
+  slippageTolerance: "",
+  userWallet: "",
 };
 
-function HederaAgentFormModal({ isOpen, onClose }) {
-  const { agents, linkWallet } = authentication();
-  const [form, setForm] = useState(initialForm);
-
-  // Reset form whenever the modal is opened
-  useEffect(() => {
-    if (isOpen) {
-      setForm(initialForm);
-    }
-  }, [isOpen]);
-
-  if (!isOpen) return null;
+function HederaAgentFormModal({ isOpen, onClose, agents }) {
+  const { registerTask } = authentication();
+  const [form, setForm] = useState(INITIAL_FORM);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+
+    setForm((prev) => ({
+      ...prev,
+      [name]:
+        name === "amount" || name === "slippageTolerance"
+          ? value === "" // allow clearing the field
+            ? ""
+            : Number(value)
+          : value,
+    }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    const payload = {
+      agentId: form.agentId,
+      taskType: form.taskType,
+      inputPayload: {
+        action: form.action,
+        fromToken: form.fromToken,
+        toToken: form.toToken,
+        amount: form.amount,
+        slippageTolerance: form.slippageTolerance,
+        userWallet: form.userWallet,
+      },
+    };
+
     try {
-      await linkWallet(form);
+      await registerTask(payload);
+      setForm(INITIAL_FORM);
       onClose();
     } catch (err) {
-      console.error("Failed to link Hedera wallet:", err);
+      console.error("Failed to register Hedera task:", err);
     }
   };
 
@@ -40,9 +62,11 @@ function HederaAgentFormModal({ isOpen, onClose }) {
     if (e.target === e.currentTarget) onClose();
   };
 
+  if (!isOpen) return null;
+
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+      className="absolute inset-0 z-50 flex items-center justify-center bg-black/60"
       onClick={handleBackdropClick}
     >
       <div className="w-full max-w-lg rounded-lg bg-[#04020f] p-6 shadow-xl">
@@ -58,32 +82,30 @@ function HederaAgentFormModal({ isOpen, onClose }) {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* agentId */}
+          {/* Agent */}
           <div className="form-control">
             <label className="label">
-              <span className="label-text">Agent ID</span>
+              <span className="label-text">Agent</span>
             </label>
-           <select
-  name="agentId"
-  value={form.agentId}
-  onChange={handleChange}
-  className="select select-bordered w-full"
-  required
->
-  <option value="" disabled>
-    Select agent
-  </option>
-
-  {agents?.map((agent) => (
-    <option key={agent.id} value={agent.id}>
-      {agent.id}
-    </option>
-  ))}
-</select>
-
+            <select
+              name="agentId"
+              value={form.agentId}
+              onChange={handleChange}
+              className="select select-bordered w-full"
+              required
+            >
+              <option value="" disabled>
+                Select agent
+              </option>
+              {agents?.map((agent) => (
+                <option key={agent.id} value={agent.id}>
+                  {agent.agent_name ?? agent.id}
+                </option>
+              ))}
+            </select>
           </div>
 
-          {/* hederaAccountId */}
+          {/* Hedera account ID */}
           <div className="form-control">
             <label className="label">
               <span className="label-text">Hedera account ID</span>
@@ -99,7 +121,7 @@ function HederaAgentFormModal({ isOpen, onClose }) {
             />
           </div>
 
-          {/* hederaPublicKey */}
+          {/* Hedera public key */}
           <div className="form-control">
             <label className="label">
               <span className="label-text">Hedera public key</span>
@@ -115,7 +137,7 @@ function HederaAgentFormModal({ isOpen, onClose }) {
             />
           </div>
 
-          {/* kmsKeyId */}
+          {/* KMS key ID */}
           <div className="form-control">
             <label className="label">
               <span className="label-text">KMS key ID</span>
@@ -131,7 +153,108 @@ function HederaAgentFormModal({ isOpen, onClose }) {
             />
           </div>
 
-          {/* Actions */}
+          {/* Task payload */}
+          <div className="divider">Task Payload</div>
+
+          <div className="form-control">
+            <label className="label">
+              <span className="label-text">Task type</span>
+            </label>
+            <select
+              name="taskType"
+              value={form.taskType}
+              onChange={handleChange}
+              className="select select-bordered w-full"
+            >
+              <option value="execution">execution</option>
+            </select>
+          </div>
+
+          <div className="form-control">
+            <label className="label">
+              <span className="label-text">Action</span>
+            </label>
+            <input
+              type="text"
+              name="action"
+              value={form.action}
+              onChange={handleChange}
+              className="input input-bordered w-full"
+              placeholder="swap_tokens"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="form-control">
+              <label className="label">
+                <span className="label-text">From token</span>
+              </label>
+              <input
+                type="text"
+                name="fromToken"
+                value={form.fromToken}
+                onChange={handleChange}
+                className="input input-bordered w-full"
+              />
+            </div>
+            <div className="form-control">
+              <label className="label">
+                <span className="label-text">To token</span>
+              </label>
+              <input
+                type="text"
+                name="toToken"
+                value={form.toToken}
+                onChange={handleChange}
+                className="input input-bordered w-full"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="form-control">
+              <label className="label">
+                <span className="label-text">Amount</span>
+              </label>
+              <input
+                type="number"
+                name="amount"
+                value={form.amount}
+                onChange={handleChange}
+                className="input input-bordered w-full"
+                min={0}
+              />
+            </div>
+            <div className="form-control">
+              <label className="label">
+                <span className="label-text">Slippage tolerance (%)</span>
+              </label>
+              <input
+                type="number"
+                name="slippageTolerance"
+                value={form.slippageTolerance}
+                onChange={handleChange}
+                className="input input-bordered w-full"
+                step="0.1"
+                min={0}
+              />
+            </div>
+          </div>
+
+          <div className="form-control">
+            <label className="label">
+              <span className="label-text">User wallet (Hedera ID)</span>
+            </label>
+            <input
+              type="text"
+              name="userWallet"
+              value={form.userWallet}
+              onChange={handleChange}
+              className="input input-bordered w-full"
+              placeholder="0.0.7148109"
+            />
+          </div>
+
           <div className="mt-6 flex justify-end gap-2">
             <button
               type="button"
@@ -141,7 +264,7 @@ function HederaAgentFormModal({ isOpen, onClose }) {
               Cancel
             </button>
             <button type="submit" className="btn btn-primary">
-              Save agent
+              Create Task
             </button>
           </div>
         </form>

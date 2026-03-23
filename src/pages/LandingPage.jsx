@@ -8,7 +8,7 @@ import { authentication } from "../store/zustant/useZustandHook"
 import { Loading } from "../components/loading/Loading"
 
 function LandingPage() {
-   const { getDashboard, dashBoard, loading } = authentication();
+   const { getDashboard,  loading } = authentication();
 
   useEffect(() => {
      getDashboard();

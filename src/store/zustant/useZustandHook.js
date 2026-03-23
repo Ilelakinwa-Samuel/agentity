@@ -8,10 +8,10 @@ export const authentication = create((set) => ({
   error: null,
   agents: [],
   agentDetails: null,
-  smartContracts: [],
   user: null,
-  audit:[],
+  audit: [],
   tasksHistory: [],
+  simulations: [],
 
   registerUser: async (payload) => {
     try {
@@ -25,7 +25,7 @@ export const authentication = create((set) => ({
         return;
       }
 
-      const { jwt, dashboard, email, name } = res.data;
+      const { dashboard, email, name } = res.data;
 
       set({
         dashBoard: dashboard,
@@ -49,14 +49,13 @@ export const authentication = create((set) => ({
 
       const res = await api.post("/auth/login", payload);
 
-
       if (!res || res.status < 200 || res.status >= 300) {
         toast.error("Login failed, please try again");
         set({ loading: false });
         return;
       }
 
-      const { jwt, dashboard, email, name } = res.data;
+      const {  dashboard, email, name } = res.data;
 
       set({
         dashBoard: dashboard,
@@ -64,8 +63,6 @@ export const authentication = create((set) => ({
         loading: false,
       });
       toast.success("Login successful!", { id: "login" });
-
-  
     } catch (err) {
       set({
         loading: false,
@@ -84,14 +81,12 @@ export const authentication = create((set) => ({
       set({ dashBoard: res.data, loading: false });
 
       toast.success("Dashboard data loaded!", { id: "load-dashboard" });
-
     } catch (err) {
       set({
         loading: false,
         error:
           err?.response?.data?.message ?? "Failed to get dashboard data",
       });
-    
     }
   },
 
@@ -102,7 +97,7 @@ export const authentication = create((set) => ({
       const res = await api.get("/agents/my");
 
       set({ agents: res.data.agents, loading: false });
-  toast.success("Agents loaded!", { id: "load-agents" });
+      toast.success("Agents loaded!", { id: "load-agents" });
     } catch (err) {
       set({
         loading: false,
@@ -111,7 +106,8 @@ export const authentication = create((set) => ({
       toast.error("Failed to load agents", { id: "load-agents" });
     }
   },
-signOut: async () => {
+
+  signOut: async () => {
     try {
       set({ loading: true, error: null });
 
@@ -127,9 +123,11 @@ signOut: async () => {
       toast.error("Logout failed, please try again", { id: "logout" });
     }
   },
+
   registerAgent: async (payload) => {
     try {
       set({ loading: true, error: null });
+
       const res = await api.post("/agents/register", payload);
 
       if (!res || res.status < 200 || res.status >= 300) {
@@ -137,7 +135,8 @@ signOut: async () => {
         set({ loading: false });
         return;
       }
-     toast.success("Agent registered!", { id: "register-agent" });
+
+      toast.success("Agent registered!", { id: "register-agent" });
       set({ loading: false });
     } catch (err) {
       set({
@@ -145,108 +144,209 @@ signOut: async () => {
         error: err?.response?.data?.message ?? "Failed to register agent",
       });
       toast.error("Failed to register agent", { id: "register-agent" });
-    }},
-    getAudit: async () => {
-      try {
-        set({ loading: true, error: null });
-        const res = await api.get(`/audits/history`);
+    }
+  },
 
-        if (!res || res.status < 200 || res.status >= 300) {
-          toast.error("Failed to load audit, please try again", { id: "load-audit" });
-          set({ loading: false });
-          return;
-        }
-       toast.success("Audit loaded!", { id: "load-audit" });
-        set({ loading: false, audit: res.data });
-      } catch (err) {
-        set({
-          loading: false,
-          error: err?.response?.data?.message ?? "Failed to load audit",
+  getAudit: async () => {
+    try {
+      set({ loading: true, error: null });
+
+      const res = await api.get("/audits/history");
+
+      if (!res || res.status < 200 || res.status >= 300) {
+        toast.error("Failed to load audit, please try again", {
+          id: "load-audit",
         });
-        toast.error("Failed to load audit", { id: "load-audit" });
-      }
-    },
-    registerContract: async (payload) => {
-      try {
-        set({ loading: true, error: null });
-        const res = await api.post("/audits", payload);
-
-        if (!res || res.status < 200 || res.status >= 300) {
-          toast.error("Contract registration failed, please try again", { id: "register-contract" });
-          set({ loading: false });
-          return;
-        }
-       toast.success("Contract registered!", { id: "register-contract" });
         set({ loading: false });
-      } catch (err) {
-        set({
-          loading: false,
-          error: err?.response?.data?.message ?? "Failed to register contract",
-        });
-        toast.error("Failed to register contract", { id: "register-contract" });
+        return;
       }
-    },
-    verifyAgent:async (agentId) => {
-      try {
-        set({ loading: true, error: null });
-        const res = await api.post(`/agents/${agentId}/verify`);
 
-        if (!res || res.status < 200 || res.status >= 300) {
-          toast.error("Agent verification failed, please try again", { id: "verify-agent" });
-          console.error("Verification failed response:", res);
-          set({ loading: false });
-          return;
-        }
-        consaole.log("Verification successful response:", res);
-       toast.success("Agent verified!", { id: "verify-agent" });
+      toast.success("Audit loaded!", { id: "load-audit" });
+      set({ loading: false, audit: res.data });
+    } catch (err) {
+      set({
+        loading: false,
+        error: err?.response?.data?.message ?? "Failed to load audit",
+      });
+      toast.error("Failed to load audit", { id: "load-audit" });
+    }
+  },
+
+  verifyAgent: async (agentId) => {
+    try {
+      set({ loading: true, error: null });
+
+      const res = await api.post(`/agents/${agentId}/verify`);
+
+      if (!res || res.status < 200 || res.status >= 300) {
+        toast.error("Agent verification failed, please try again", {
+          id: "verify-agent",
+        });
+        console.error("Verification failed response:", res);
         set({ loading: false });
-      } catch (err) {
-        set({
-          loading: false,
-          error: err?.response?.data?.message ?? "Failed to verify agent",
-        });
-        toast.error("Failed to verify agent", { id: "verify-agent" });
-      }},
-      linkWallet: async (payload) => {
-        try {
-          set({ loading: true, error: null });
-          const res = await api.post("/wallets/link", payload);
-
-          if (!res || res.status < 200 || res.status >= 300) {
-            toast.error("Wallet linking failed, please try again", { id: "link-wallet" });
-            set({ loading: false });
-            return;
-          }
-         toast.success("Wallet linked!", { id: "link-wallet" });
-          set({ loading: false });
-        } catch (err) {
-          set({
-            loading: false,
-            error: err?.response?.data?.message ?? "Failed to link wallet",
-          });
-          toast.error("Failed to link wallet", { id: "link-wallet" });
-        }
-      },
-      getTasksHistory: async () => {
-        try {
-          set({ loading: true, error: null });
-          const res = await api.get("/tasks/history");
-
-          if (!res || res.status < 200 || res.status >= 300) {
-            toast.error("Failed to load tasks history, please try again", { id: "load-tasks-history" });
-            set({ loading: false ,});
-            return;
-          }
-         toast.success("Tasks history loaded!", { id: "load-tasks-history" });
-          set({ loading: false, tasksHistory: res.data });
-        } catch (err) {
-          set({
-            loading: false,
-            error: err?.response?.data?.message ?? "Failed to load tasks history",
-          });
-          toast.error("Failed to load tasks history", { id: "load-tasks-history" });
-        }
+        return;
       }
 
+      console.log("Verification successful response:", res);
+      toast.success("Agent verified!", { id: "verify-agent" });
+      set({ loading: false });
+    } catch (err) {
+      set({
+        loading: false,
+        error: err?.response?.data?.message ?? "Failed to verify agent",
+      });
+      toast.error("Failed to verify agent", { id: "verify-agent" });
+    }
+  },
 
+  getTasksHistory: async () => {
+    try {
+      set({ loading: true, error: null });
+
+      const res = await api.get("/tasks/history");
+
+      if (!res || res.status < 200 || res.status >= 300) {
+        toast.error("Failed to load tasks history, please try again", {
+          id: "load-tasks-history",
+        });
+        set({ loading: false });
+        return;
+      }
+
+      toast.success("Tasks history loaded!", { id: "load-tasks-history" });
+      set({ loading: false, tasksHistory: res.data });
+    } catch (err) {
+      set({
+        loading: false,
+        error:
+          err?.response?.data?.message ?? "Failed to load tasks history",
+      });
+      toast.error("Failed to load tasks history", {
+        id: "load-tasks-history",
+      });
+    }
+  },
+
+  runSimulation: async (payload) => {
+    try {
+      set({ loading: true, error: null });
+
+      const res = await api.post("/simulation/run", payload);
+
+      if (!res || res.status < 200 || res.status >= 300) {
+        toast.error("Simulation failed, please try again", {
+          id: "run-simulation",
+        });
+        set({ loading: false });
+        return;
+      }
+
+      toast.success("Simulation run successfully!", {
+        id: "run-simulation",
+      });
+      set({ loading: false });
+    } catch (err) {
+      set({
+        loading: false,
+        error: err?.response?.data?.message ?? "Failed to run simulation",
+      });
+      toast.error("Failed to run simulation", { id: "run-simulation" });
+    }
+  },
+
+  getSimulations: async () => {
+    try {
+      set({ loading: true, error: null });
+
+      const res = await api.get("/simulation/history");
+
+      if (!res || res.status < 200 || res.status >= 300) {
+        toast.error("Failed to load simulations, please try again", {
+          id: "load-simulations",
+        });
+        set({ loading: false });
+        return;
+      }
+
+      toast.success("Simulations loaded!", { id: "load-simulations" });
+      set({ loading: false, simulations: res.data.items });
+    } catch (err) {
+      set({
+        loading: false,
+        error: err?.response?.data?.message ?? "Failed to load simulations",
+      });
+      toast.error("Failed to load simulations", { id: "load-simulations" });
+    }
+  },
+  registerTask: async (payload) => {
+    try {
+      set({ loading: true, error: null });
+
+      const res = await api.post("/tasks/request", payload);
+
+      if (!res || res.status < 200 || res.status >= 300) {
+        toast.error("Task registration failed, please try again", {
+          id: "register-task",
+        });
+        set({ loading: false });
+        return;
+      }
+
+      toast.success("Task registered!", { id: "register-task" });
+      set({ loading: false });
+    } catch (err) {
+      set({
+        loading: false,
+        error: err?.response?.data?.message ?? "Failed to register task",
+      });
+      toast.error("Failed to register task", { id: "register-task" });
+    }
+  },
+  payTask:async (id)=>{
+    try {
+      set({ loading: true, error: null });
+
+      const res = await api.post(`/tasks/${id}/pay`);
+
+      if (!res || res.status < 200 || res.status >= 300) {
+        toast.error("Payment failed, please try again", {
+          id: "pay-task",
+        });
+        set({ loading: false });
+        return;
+      }
+
+      toast.success("Task paid!", { id: "pay-task" });
+      set({ loading: false });
+    } catch (err) {
+      set({
+        loading: false,
+        error: err?.response?.data?.message ?? "Failed to pay for task",
+      });
+      toast.error("Failed to pay for task", { id: "pay-task" });
+  }},
+  executeTask:async (id)=>{
+    try {
+      set({ loading: true, error: null });
+
+      const res = await api.post(`/tasks/${id}/execute`);
+
+      if (!res || res.status < 200 || res.status >= 300) {
+        toast.error("Execution failed, please try again", {
+          id: "execute-task",
+        });
+        set({ loading: false });
+        return;
+      }
+
+      toast.success("Task executed!", { id: "execute-task" });
+      set({ loading: false });
+    } catch (err) {
+      set({
+        loading: false,
+        error: err?.response?.data?.message ?? "Failed to execute task",
+      });
+      toast.error("Failed to execute task", { id: "execute-task" });
+    }
+  }
 }));
