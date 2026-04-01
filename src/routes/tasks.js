@@ -23,7 +23,7 @@ const { createTransactionRecord } = require("../services/transactions/transactio
  * @openapi
  * tags:
  *   - name: Tasks
- *     description: Hedera-native AI agent task coordination
+ *     description: Hedera-native AI agent task coordination and execution lifecycle
  */
 
 /**
@@ -32,6 +32,14 @@ const { createTransactionRecord } = require("../services/transactions/transactio
  *   post:
  *     tags: [Tasks]
  *     summary: Create a new task request for an agent
+ *     description: |
+ *       Creates a task owned by the authenticated user.
+ *       This is the first step in the task lifecycle:
+ *       `request -> simulate -> pay -> execute`.
+ *
+ *       Frontend testing note:
+ *       - use the returned `id` for the remaining `/simulate`, `/pay`, and `/execute` endpoints
+ *       - `agentId` must belong to the authenticated user
  *     security:
  *       - bearerAuth: []
  *       - cookieAuth: []
@@ -50,9 +58,40 @@ const { createTransactionRecord } = require("../services/transactions/transactio
  *                 example: "execution"
  *               inputPayload:
  *                 type: object
+ *                 additionalProperties: true
+ *                 example:
+ *                   target: "swap"
+ *                   network: "hedera-testnet"
+ *                   maxSlippageBps: 100
  *     responses:
  *       201:
  *         description: Task created
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: string
+ *                   example: "9e75f7fd-fd1c-4b6d-91ab-3ecdb9d8d222"
+ *                 agentId:
+ *                   type: string
+ *                   example: "ac0d21d5-bb02-4d52-8004-4725488cf007"
+ *                 taskType:
+ *                   type: string
+ *                   example: "execution"
+ *                 status:
+ *                   type: string
+ *                   example: "requested"
+ *                 createdAt:
+ *                   type: string
+ *                   format: date-time
+ *       400:
+ *         description: Missing required request fields
+ *       401:
+ *         description: Missing or invalid authentication token
+ *       404:
+ *         description: Agent not found for the authenticated user
  */
 router.post("/request", requireAuth, async (req, res, next) => {
   try {
@@ -108,6 +147,12 @@ router.post("/request", requireAuth, async (req, res, next) => {
  *   post:
  *     tags: [Tasks]
  *     summary: Simulate a task before execution
+ *     description: |
+ *       Runs a sandbox simulation for the selected task and stores the resulting
+ *       risk metrics on the task record.
+ *
+ *       This endpoint may also create an alert when the simulation outcome crosses
+ *       a risk threshold defined by the alert utilities.
  *     security:
  *       - bearerAuth: []
  *       - cookieAuth: []
@@ -119,6 +164,33 @@ router.post("/request", requireAuth, async (req, res, next) => {
  *     responses:
  *       200:
  *         description: Task simulated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 taskId:
+ *                   type: string
+ *                 simulationRunId:
+ *                   type: string
+ *                 riskScore:
+ *                   type: number
+ *                   example: 35
+ *                 vulnerabilitiesCount:
+ *                   type: integer
+ *                   example: 1
+ *                 status:
+ *                   type: string
+ *                   example: "simulated"
+ *                 result:
+ *                   type: object
+ *                   additionalProperties: true
+ *       401:
+ *         description: Missing or invalid authentication token
+ *       404:
+ *         description: Task or agent not found
+ *       500:
+ *         description: Simulation failed
  */
 router.post("/:id/simulate", requireAuth, async (req, res, next) => {
   try {
@@ -225,6 +297,14 @@ router.post("/:id/simulate", requireAuth, async (req, res, next) => {
  *   post:
  *     tags: [Tasks]
  *     summary: Create and settle Hedera payment for a task
+ *     description: |
+ *       Creates a payment quote, attempts settlement, updates the task status,
+ *       and writes a transaction record for downstream reporting.
+ *
+ *       Frontend testing note:
+ *       - call this after simulation has completed
+ *       - if Hedera is not configured, the backend may still mark the flow as simulated
+ *       - payment failures can trigger alert creation
  *     security:
  *       - bearerAuth: []
  *       - cookieAuth: []
@@ -236,6 +316,34 @@ router.post("/:id/simulate", requireAuth, async (req, res, next) => {
  *     responses:
  *       200:
  *         description: Task paid
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 taskId:
+ *                   type: string
+ *                 paymentId:
+ *                   type: string
+ *                 amountHbar:
+ *                   type: number
+ *                   example: 0.5
+ *                 hederaTxId:
+ *                   nullable: true
+ *                   type: string
+ *                   example: "0.0.5001@1710000000.000000001"
+ *                 simulated:
+ *                   type: boolean
+ *                   example: true
+ *                 status:
+ *                   type: string
+ *                   example: "paid"
+ *       401:
+ *         description: Missing or invalid authentication token
+ *       404:
+ *         description: Task not found
+ *       500:
+ *         description: Payment or transaction persistence failed
  */
 router.post("/:id/pay", requireAuth, async (req, res, next) => {
   try {
@@ -339,6 +447,14 @@ router.post("/:id/pay", requireAuth, async (req, res, next) => {
  *   post:
  *     tags: [Tasks]
  *     summary: Execute a paid task through CRE and optional KMS audit
+ *     description: |
+ *       Executes a task after simulation and payment.
+ *       The backend:
+ *       - loads the related simulation result
+ *       - calls the CRE execution service
+ *       - signs the execution payload with KMS when a key is linked
+ *       - stores a transaction record
+ *       - raises a critical alert if execution fails
  *     security:
  *       - bearerAuth: []
  *       - cookieAuth: []
@@ -350,6 +466,41 @@ router.post("/:id/pay", requireAuth, async (req, res, next) => {
  *     responses:
  *       200:
  *         description: Task executed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 taskId:
+ *                   type: string
+ *                 agentId:
+ *                   type: string
+ *                 status:
+ *                   type: string
+ *                   example: "completed"
+ *                 execution:
+ *                   type: object
+ *                   additionalProperties: true
+ *                 kms:
+ *                   type: object
+ *                   properties:
+ *                     signature:
+ *                       nullable: true
+ *                       type: string
+ *                     digest:
+ *                       type: string
+ *                     simulated:
+ *                       type: boolean
+ *                     auditId:
+ *                       type: string
+ *       400:
+ *         description: Task is not yet eligible for execution
+ *       401:
+ *         description: Missing or invalid authentication token
+ *       404:
+ *         description: Task or agent not found
+ *       500:
+ *         description: CRE execution or KMS signing failed
  */
 router.post("/:id/execute", requireAuth, async (req, res, next) => {
   try {
@@ -488,7 +639,9 @@ router.post("/:id/execute", requireAuth, async (req, res, next) => {
  *   get:
  *     tags: [Tasks]
  *     summary: Get task history for authenticated user
- *     description: Returns task execution history for the logged-in user.
+ *     description: |
+ *       Returns task execution history for the logged-in user in a normalized frontend-friendly shape.
+ *       Use this endpoint for tables, activity feeds, and task lifecycle dashboards.
  *     security:
  *       - bearerAuth: []
  *       - cookieAuth: []
@@ -544,6 +697,8 @@ router.post("/:id/execute", requireAuth, async (req, res, next) => {
  *                         example: "2026-03-16T15:50:00.000Z"
  *       401:
  *         description: Unauthorized
+ *       500:
+ *         description: Failed to load task history
  */
 router.get("/history", requireAuth, async (req, res, next) => {
   try {

@@ -13,9 +13,77 @@ const Alert = require("../models/alert");
  * @openapi
  * tags:
  *   - name: Workflow
- *     description: Product-flow summary endpoints for dashboard onboarding
+ *     description: Product-flow summary endpoints for dashboard onboarding and progress tracking
  */
 
+/**
+ * @openapi
+ * /workflow/summary:
+ *   get:
+ *     tags: [Workflow]
+ *     summary: Get the authenticated user's backend workflow progress summary
+ *     description: |
+ *       Returns a high-level progress snapshot the frontend can use to drive onboarding,
+ *       product walkthroughs, or setup checklists.
+ *
+ *       The response includes:
+ *       - aggregate counts for major backend resources
+ *       - step-by-step completion flags for the expected product workflow
+ *       - the next API endpoints the frontend can call to advance the user
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     responses:
+ *       200:
+ *         description: Workflow summary and completion checklist
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 summary:
+ *                   type: object
+ *                   properties:
+ *                     totalAgents:
+ *                       type: integer
+ *                       example: 3
+ *                     verifiedAgents:
+ *                       type: integer
+ *                       example: 2
+ *                     linkedWallets:
+ *                       type: integer
+ *                       example: 1
+ *                     simulations:
+ *                       type: integer
+ *                       example: 5
+ *                     paidTransactions:
+ *                       type: integer
+ *                       example: 2
+ *                     completedTasks:
+ *                       type: integer
+ *                       example: 2
+ *                     activeAlerts:
+ *                       type: integer
+ *                       example: 1
+ *                 steps:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       key:
+ *                         type: string
+ *                         example: "register-agent"
+ *                       completed:
+ *                         type: boolean
+ *                         example: true
+ *                       endpoint:
+ *                         type: string
+ *                         example: "POST /agents/register"
+ *       401:
+ *         description: Missing or invalid authentication token
+ *       500:
+ *         description: Failed to build workflow summary
+ */
 router.get("/summary", requireAuth, async (req, res, next) => {
   try {
     const [

@@ -11,7 +11,7 @@ const { createAlert } = require("../services/alerts/alertService");
  * @openapi
  * tags:
  *   - name: Audits
- *     description: Smart contract audit endpoints
+ *     description: Smart contract audit submission, history, and result inspection
  */
 
 /**
@@ -20,6 +20,14 @@ const { createAlert } = require("../services/alerts/alertService");
  *   post:
  *     tags: [Audits]
  *     summary: Create and run a smart contract audit
+ *     description: |
+ *       Submits a smart contract for analysis using either pasted source code or a GitHub URL.
+ *       The audit result is stored and can later be retrieved from `/audits/history` or `/audits/{id}`.
+ *
+ *       Frontend testing note:
+ *       - use `sourceType: paste` with `sourceCode` for direct text audits
+ *       - use `sourceType: github` with `githubUrl` for repository-based audits
+ *       - high-risk and critical results may trigger alert creation
  *     security:
  *       - bearerAuth: []
  *       - cookieAuth: []
@@ -39,15 +47,47 @@ const { createAlert } = require("../services/alerts/alertService");
  *                 enum: [paste, github]
  *               sourceCode:
  *                 type: string
+ *                 example: "contract Vault { function withdraw() external {} }"
  *               githubUrl:
  *                 type: string
+ *                 example: "https://github.com/example/protocol/blob/main/contracts/Vault.sol"
  *     responses:
  *       201:
  *         description: Audit completed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: string
+ *                 contractName:
+ *                   type: string
+ *                 riskLevel:
+ *                   type: string
+ *                   example: "medium"
+ *                 consensusScore:
+ *                   type: number
+ *                   example: 82
+ *                 status:
+ *                   type: string
+ *                   example: "completed"
+ *                 createdAt:
+ *                   type: string
+ *                   format: date-time
+ *                 findings:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     additionalProperties: true
+ *                 summary:
+ *                   type: string
  *       400:
  *         description: Invalid input
  *       401:
  *         description: Unauthorized
+ *       500:
+ *         description: Audit execution failed
  */
 router.post("/", requireAuth, async (req, res, next) => {
   try {
@@ -152,14 +192,40 @@ router.post("/", requireAuth, async (req, res, next) => {
  *   get:
  *     tags: [Audits]
  *     summary: Get audit history for authenticated user
+ *     description: Returns recent audit jobs for the current user ordered from newest to oldest.
  *     security:
  *       - bearerAuth: []
  *       - cookieAuth: []
  *     responses:
  *       200:
  *         description: Audit history
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 items:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                       contractName:
+ *                         type: string
+ *                       riskLevel:
+ *                         type: string
+ *                       consensusScore:
+ *                         type: number
+ *                       status:
+ *                         type: string
+ *                       createdAt:
+ *                         type: string
+ *                         format: date-time
  *       401:
  *         description: Unauthorized
+ *       500:
+ *         description: Failed to load audit history
  */
 router.get("/history", requireAuth, async (req, res, next) => {
   try {
@@ -190,6 +256,9 @@ router.get("/history", requireAuth, async (req, res, next) => {
  *   get:
  *     tags: [Audits]
  *     summary: Get full audit result by id
+ *     description: |
+ *       Returns the full persisted audit payload for one audit owned by the authenticated user.
+ *       This is the endpoint the frontend should use for audit detail pages and downloadable reports.
  *     security:
  *       - bearerAuth: []
  *       - cookieAuth: []
@@ -201,10 +270,48 @@ router.get("/history", requireAuth, async (req, res, next) => {
  *     responses:
  *       200:
  *         description: Full audit result
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: string
+ *                 contractName:
+ *                   type: string
+ *                 sourceType:
+ *                   type: string
+ *                 sourceCode:
+ *                   nullable: true
+ *                   type: string
+ *                 githubUrl:
+ *                   nullable: true
+ *                   type: string
+ *                 riskLevel:
+ *                   type: string
+ *                 consensusScore:
+ *                   type: number
+ *                 status:
+ *                   type: string
+ *                 findings:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     additionalProperties: true
+ *                 summary:
+ *                   type: string
+ *                 createdAt:
+ *                   type: string
+ *                   format: date-time
+ *                 result:
+ *                   type: object
+ *                   additionalProperties: true
  *       401:
  *         description: Unauthorized
  *       404:
  *         description: Not found
+ *       500:
+ *         description: Failed to load audit details
  */
 router.get("/:id", requireAuth, async (req, res, next) => {
   try {
