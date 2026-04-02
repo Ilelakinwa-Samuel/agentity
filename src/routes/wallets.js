@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const { Op } = require("sequelize");
 
 const Agent = require("../models/agent");
 const AgentWallet = require("../models/agentWallet");
@@ -76,16 +77,66 @@ router.post("/link", requireAuth, async (req, res, next) => {
       return res.status(404).json({ message: "Agent not found for this user" });
     }
 
-    await AgentWallet.upsert(
-      {
+    const existingWalletForAgent = await AgentWallet.findOne({
+      where: { agent_id: agent.id },
+    });
+
+    const existingWalletForAccount = await AgentWallet.findOne({
+      where: {
+        hedera_account_id: trimmedHederaAccountId,
+        agent_id: { [Op.ne]: agent.id },
+      },
+      include: [
+        {
+          model: Agent,
+          as: "agent",
+          required: false,
+          attributes: ["id", "creator_id"],
+        },
+      ],
+    });
+
+    if (
+      existingWalletForAccount &&
+      existingWalletForAccount.agent?.creator_id &&
+      existingWalletForAccount.agent.creator_id !== req.user.id
+    ) {
+      return res.status(409).json({
+        message: "This Hedera account is already linked to another user's agent",
+      });
+    }
+
+    if (
+      existingWalletForAgent &&
+      existingWalletForAccount &&
+      existingWalletForAgent.id !== existingWalletForAccount.id
+    ) {
+      await existingWalletForAgent.destroy();
+    }
+
+    if (existingWalletForAgent) {
+      await existingWalletForAgent.update({
+        hedera_account_id: trimmedHederaAccountId,
+        hedera_public_key: trimmedHederaPublicKey,
+        kms_key_id: trimmedKmsKeyId || null,
+        status: "linked",
+      });
+    } else if (existingWalletForAccount) {
+      await existingWalletForAccount.update({
+        agent_id: agent.id,
+        hedera_public_key: trimmedHederaPublicKey,
+        kms_key_id: trimmedKmsKeyId || null,
+        status: "linked",
+      });
+    } else {
+      await AgentWallet.create({
         agent_id: agent.id,
         hedera_account_id: trimmedHederaAccountId,
         hedera_public_key: trimmedHederaPublicKey,
         kms_key_id: trimmedKmsKeyId || null,
         status: "linked",
-      },
-      { returning: true },
-    );
+      });
+    }
 
     const wallet = await AgentWallet.findOne({
       where: { agent_id: agent.id },
@@ -110,6 +161,13 @@ router.post("/link", requireAuth, async (req, res, next) => {
       createdAt: wallet.created_at,
     });
   } catch (error) {
+    if (error?.name === "SequelizeUniqueConstraintError") {
+      return res.status(409).json({
+        message:
+          "Wallet link conflict detected. This Hedera account may already be linked.",
+      });
+    }
+
     next(error);
   }
 });

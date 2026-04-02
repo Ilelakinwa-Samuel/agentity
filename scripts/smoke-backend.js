@@ -47,8 +47,12 @@ function createRunner() {
       const result = await request(method, path, body, options);
 
       if (!result.ok) {
+        const conflictMessage =
+          result.status === 409 && path === "/wallets/link"
+            ? "\n[SMOKE] Wallet conflict detected. Run `npm run smoke:wallet:inspect` to inspect the current owner, or release a stale smoke link with `SMOKE_RELEASE_CONFIRM=YES_RELEASE_SMOKE_WALLET npm run smoke:wallet:release`."
+            : "";
         throw new Error(
-          `${label} failed (${result.status}): ${JSON.stringify(result.payload)}`,
+          `${label} failed (${result.status}): ${JSON.stringify(result.payload)}${conflictMessage}`,
         );
       }
 
@@ -83,9 +87,10 @@ contract SmokeVault {
 async function main() {
   const runner = createRunner();
   const nonce = Date.now();
-  const email = `smoke.${nonce}@example.com`;
-  const password = `SmokeTest!${String(nonce).slice(-6)}`;
-  const name = `Smoke Tester ${String(nonce).slice(-4)}`;
+  const email = process.env.SMOKE_EMAIL || `smoke.${nonce}@example.com`;
+  const password =
+    process.env.SMOKE_PASSWORD || `SmokeTest!${String(nonce).slice(-6)}`;
+  const name = process.env.SMOKE_NAME || `Smoke Tester ${String(nonce).slice(-4)}`;
   const walletDetails = SMOKE_WALLET_CONFIGURED
     ? {
         hederaAccountId: process.env.SMOKE_HEDERA_ACCOUNT_ID,
@@ -126,12 +131,33 @@ async function main() {
     throw new Error("System status did not report a connected database");
   }
 
-  const register = await runner.step("Register auth user", "POST", "/auth/register", {
-    email,
-    password,
-    name,
-  });
-  runner.setAuthToken(register.jwt);
+  let authPayload;
+
+  if (process.env.SMOKE_EMAIL && process.env.SMOKE_PASSWORD) {
+    try {
+      authPayload = await runner.step("Login smoke user", "POST", "/auth/login", {
+        email,
+        password,
+      });
+    } catch (loginError) {
+      console.log(
+        "[SMOKE] Existing smoke user login failed, attempting first-time registration with the configured credentials.",
+      );
+      authPayload = await runner.step("Register smoke user", "POST", "/auth/register", {
+        email,
+        password,
+        name,
+      });
+    }
+  } else {
+    authPayload = await runner.step("Register auth user", "POST", "/auth/register", {
+      email,
+      password,
+      name,
+    });
+  }
+
+  runner.setAuthToken(authPayload.jwt);
 
   await runner.step("Fetch dashboard overview", "GET", "/dashboard/overview");
 
