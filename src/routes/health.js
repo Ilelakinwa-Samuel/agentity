@@ -14,9 +14,18 @@ const router = express.Router();
  *   get:
  *     tags: [Health]
  *     summary: Health check
+ *     description: Lightweight endpoint for uptime, monitoring, and deployment verification.
  *     responses:
  *       200:
  *         description: OK
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok:
+ *                   type: boolean
+ *                   example: true
  *       500:
  *         description: Database disconnected
  */

@@ -137,6 +137,9 @@ function setAuthCookie(res, jwt) {
  *     tags: [Auth]
  *     summary: Logout user
  *     description: Clears the agentity_jwt httpOnly cookie. Frontend should also remove any locally stored JWT after this call.
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
  *     responses:
  *       200:
  *         description: Logout successful
@@ -154,6 +157,8 @@ function setAuthCookie(res, jwt) {
  *                 message:
  *                   type: string
  *                   example: "Signed out successfully"
+ *       401:
+ *         description: Included for frontend consistency, though logout can safely be called without an active session
  */
 
 router.post("/register", async (req, res, next) => {

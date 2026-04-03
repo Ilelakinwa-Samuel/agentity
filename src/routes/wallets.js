@@ -43,12 +43,37 @@ const { logEvent } = require("../services/audit/logEvent");
  *     responses:
  *       200:
  *         description: Linked wallet
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: string
+ *                 agentId:
+ *                   type: string
+ *                 hederaAccountId:
+ *                   type: string
+ *                   example: "0.0.8479610"
+ *                 hederaPublicKey:
+ *                   type: string
+ *                 kmsKeyId:
+ *                   nullable: true
+ *                   type: string
+ *                 status:
+ *                   type: string
+ *                   example: "linked"
+ *                 createdAt:
+ *                   type: string
+ *                   format: date-time
  *       400:
  *         description: Invalid input
  *       401:
  *         description: Unauthorized
  *       404:
  *         description: Agent not found
+ *       409:
+ *         description: Hedera account already linked to another user's agent
  */
 router.post("/link", requireAuth, async (req, res, next) => {
   try {

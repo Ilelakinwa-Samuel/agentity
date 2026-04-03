@@ -31,9 +31,23 @@ const SCENARIOS = [
  *   get:
  *     tags: [Simulation]
  *     summary: Get supported simulation scenarios
+ *     description: Returns the preset scenario labels the frontend can show in simulation forms or dropdowns.
  *     responses:
  *       200:
  *         description: Scenario list
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 items:
+ *                   type: array
+ *                   items:
+ *                     type: string
+ *                   example:
+ *                     - "Token Swap"
+ *                     - "Liquidity Pool"
+ *                     - "NFT Mint"
  */
 router.get("/scenarios", (req, res) => {
   return res.json({ items: SCENARIOS });
@@ -139,6 +153,9 @@ router.get("/history", requireAuth, async (req, res, next) => {
  *   post:
  *     tags: [Simulation]
  *     summary: Run a simulation for a selected agent and scenario
+ *     description: |
+ *       Runs a sandbox simulation for one of the authenticated user's agents.
+ *       This endpoint supports explicit `parameters` so it is easy to test directly from Swagger.
  *     security:
  *       - bearerAuth: []
  *       - cookieAuth: []
@@ -156,15 +173,56 @@ router.get("/history", requireAuth, async (req, res, next) => {
  *               scenarioType:
  *                 type: string
  *                 example: "Token Swap"
+ *               parameters:
+ *                 type: object
+ *                 additionalProperties: true
+ *                 example:
+ *                   amount: 10
+ *                   tokenIn: "USDC"
+ *                   tokenOut: "HBAR"
  *     responses:
  *       200:
  *         description: Simulation result
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: string
+ *                 agentId:
+ *                   type: string
+ *                 agentName:
+ *                   type: string
+ *                 scenario:
+ *                   type: string
+ *                   example: "Token Swap"
+ *                 riskScore:
+ *                   type: number
+ *                   example: 35
+ *                 vulnerabilities:
+ *                   type: integer
+ *                   example: 1
+ *                 status:
+ *                   type: string
+ *                   example: "completed"
+ *                 createdAt:
+ *                   type: string
+ *                   format: date-time
+ *                 parameters:
+ *                   type: object
+ *                   additionalProperties: true
+ *                 result:
+ *                   type: object
+ *                   additionalProperties: true
  *       400:
  *         description: Bad request
  *       401:
  *         description: Unauthorized
  *       404:
  *         description: Agent not found
+ *       500:
+ *         description: Simulation execution failed
  */
 router.post("/run", requireAuth, async (req, res, next) => {
   try {
@@ -269,6 +327,9 @@ router.post("/run", requireAuth, async (req, res, next) => {
  *   post:
  *     tags: [Simulation]
  *     summary: Backward-compatible direct simulation by agent id
+ *     description: |
+ *       Runs a direct simulation against an agent id from the path.
+ *       This route is useful for quick testing from Swagger when the agent id is already known.
  *     security:
  *       - bearerAuth: []
  *       - cookieAuth: []
@@ -278,9 +339,30 @@ router.post("/run", requireAuth, async (req, res, next) => {
  *         required: true
  *         schema: { type: string }
  *         description: Agent UUID
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               scenarioType:
+ *                 type: string
+ *                 example: "Direct Simulation"
+ *               parameters:
+ *                 type: object
+ *                 additionalProperties: true
+ *                 example:
+ *                   amount: 5
+ *                   purpose: "swagger-test"
  *     responses:
  *       200:
  *         description: Simulation result
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               additionalProperties: true
  *       401:
  *         description: Unauthorized
  *       404:

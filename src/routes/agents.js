@@ -137,9 +137,114 @@ async function getLatestAgentActivity(agentId) {
  *   post:
  *     tags: [Agents]
  *     summary: Register agent and tie it to the authenticated user
+ *     description: |
+ *       Registers a new agent for the authenticated user.
+ *       This is the starting point for the full agent lifecycle in Swagger:
+ *       register -> verify -> simulate -> pay -> execute.
+ *
+ *       Swagger testing note:
+ *       - `agentName` and `publicKey` are the easiest fields to use in Try it out
+ *       - snake_case aliases are also accepted for compatibility
  *     security:
  *       - bearerAuth: []
  *       - cookieAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [agentName, publicKey]
+ *             properties:
+ *               agentName:
+ *                 type: string
+ *                 example: "Treasury Risk Monitor"
+ *                 description: Frontend-friendly camelCase field for the agent name.
+ *               publicKey:
+ *                 type: string
+ *                 example: "0x42Ec816b0923eEF0c76589627107AdaBb749AB75"
+ *                 description: Agent wallet or public identity key. Used for uniqueness and fingerprinting.
+ *               description:
+ *                 type: string
+ *                 example: "Monitors treasury and payment risk for the DAO."
+ *               agentType:
+ *                 type: string
+ *                 example: "risk-monitor"
+ *               apiEndpoint:
+ *                 type: string
+ *                 example: "https://agent.example.com/api"
+ *               modelName:
+ *                 type: string
+ *                 example: "gpt-4.1"
+ *               version:
+ *                 type: string
+ *                 example: "1.0.0"
+ *               executionEnvironment:
+ *                 type: string
+ *                 example: "api"
+ *               metadata:
+ *                 type: object
+ *                 additionalProperties: true
+ *                 example:
+ *                   provider: "openai"
+ *                   tier: "production"
+ *               agent_name:
+ *                 type: string
+ *                 deprecated: true
+ *               public_key:
+ *                 type: string
+ *                 deprecated: true
+ *               agent_type:
+ *                 type: string
+ *                 deprecated: true
+ *               api_endpoint:
+ *                 type: string
+ *                 deprecated: true
+ *               model_name:
+ *                 type: string
+ *                 deprecated: true
+ *               execution_environment:
+ *                 type: string
+ *                 deprecated: true
+ *     responses:
+ *       201:
+ *         description: Agent registered successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: string
+ *                   example: "ac0d21d5-bb02-4d52-8004-4725488cf007"
+ *                 creatorId:
+ *                   type: string
+ *                   example: "e88a0b64-5cf9-4c13-b095-f5667c2745ff"
+ *                 agentName:
+ *                   type: string
+ *                   example: "Treasury Risk Monitor"
+ *                 publicKey:
+ *                   type: string
+ *                   example: "0x42Ec816b0923eEF0c76589627107AdaBb749AB75"
+ *                 fingerprint:
+ *                   type: string
+ *                   example: "b9e3f7d1a2c4"
+ *                 status:
+ *                   type: string
+ *                   example: "pending"
+ *                 agentType:
+ *                   nullable: true
+ *                   type: string
+ *                   example: "risk-monitor"
+ *                 createdAt:
+ *                   type: string
+ *                   format: date-time
+ *       400:
+ *         description: Missing required registration fields
+ *       401:
+ *         description: Missing or invalid authentication token
+ *       409:
+ *         description: Agent already exists for the given public key
  */
 router.post("/register", requireAuth, async (req, res) => {
   const transaction = await sequelize.transaction();
@@ -649,6 +754,8 @@ router.get("/:id", requireAuth, async (req, res) => {
  *                       example: "Agent verification succeeded locally, but Hedera sync failed."
  *       401:
  *         description: Unauthorized
+ *       400:
+ *         description: Invalid wallet-link payload or verification precondition failure
  *       404:
  *         description: Agent not found
  *       500:

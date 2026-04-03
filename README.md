@@ -121,6 +121,39 @@ https://agentity-backend.onrender.com/docs
 
 Swagger allows direct API testing through **Try It Out**.
 
+## Recommended Swagger Test Flow
+
+Use Swagger in this order for the smoothest end-to-end backend test:
+
+```text
+1. POST /auth/register or POST /auth/login
+2. POST /agents/register
+3. GET /agents/my
+4. POST /agents/{id}/verify
+5. POST /wallets/link
+6. POST /simulation/run
+7. POST /tasks/request
+8. POST /tasks/{id}/simulate
+9. POST /tasks/{id}/pay
+10. POST /tasks/{id}/execute
+11. POST /payments/kibble-link
+12. GET /payments/history
+13. GET /transactions/history
+14. GET /workflow/summary
+15. GET /alerts
+```
+
+### Swagger Tips
+
+```text
+Use the JWT returned from login/register in the Authorization header as:
+Bearer <jwt>
+
+If a route requires an agent id, first fetch it from GET /agents/my.
+
+If a route requires a task id, first create it from POST /tasks/request.
+```
+
 
 
 # Authentication Flow

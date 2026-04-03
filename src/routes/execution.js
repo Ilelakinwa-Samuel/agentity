@@ -35,13 +35,43 @@ const { createTransactionRecord } = require("../services/transactions/transactio
  *         required: true
  *         schema: { type: string }
  *         description: Agent UUID
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               note:
+ *                 type: string
+ *                 example: "Manual execution triggered from Swagger"
+ *                 description: Optional note for frontend/operator context. Currently ignored by the backend logic.
  *     responses:
  *       200:
  *         description: Simulation + execution + blockchain result
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 simulation:
+ *                   type: object
+ *                   additionalProperties: true
+ *                 execution:
+ *                   type: object
+ *                   additionalProperties: true
+ *                 blockchain:
+ *                   nullable: true
+ *                   type: object
+ *                   additionalProperties: true
  *       400:
  *         description: Agent must be verified
+ *       401:
+ *         description: Unauthorized
  *       404:
  *         description: Agent not found
+ *       500:
+ *         description: Execution failed
  */
 router.post("/:id", requireAuth, async (req, res, next) => {
   try {
