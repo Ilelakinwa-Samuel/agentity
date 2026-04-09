@@ -1,5 +1,5 @@
 {
-  "name": "agentity",
+  "name": "@agentity/backend",
   "version": "1.0.0",
   "description": "Agentity Identity Registry Backend",
   "main": "src/server.js",
