@@ -1,0 +1,16 @@
+{
+  "name": "agentity",
+  "private": true,
+  "workspaces": [
+    "apps/frontend",
+    "apps/backend"
+  ],
+  "scripts": {
+    "install:all": "npm install --workspaces",
+    "dev:frontend": "npm run dev --workspace apps/frontend",
+    "dev:backend": "npm run dev --workspace apps/backend",
+    "build:frontend": "npm run build --workspace apps/frontend",
+    "start:backend": "npm run start --workspace apps/backend",
+    "lint:frontend": "npm run lint --workspace apps/frontend"
+  }
+}
