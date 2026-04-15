@@ -179,7 +179,7 @@ async function hydrateAgentRelations(agents) {
     }),
     AgentHcsRegistry.findAll({
       where: { agent_id: { [Op.in]: agentIds } },
-      order: [["updatedAt", "DESC"], ["createdAt", "DESC"]],
+      order: [["updated_at", "DESC"], ["created_at", "DESC"]],
     }),
   ]);
 
